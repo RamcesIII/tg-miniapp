@@ -5,7 +5,6 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>نمایشگاه کامیون و کشنده میرآخورلی</title>
 
-  <!-- کتابخانه‌ها -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
@@ -14,18 +13,16 @@
     :root{
       --bg: var(--tg-theme-bg-color,#fff);
       --fg: var(--tg-theme-text-color,#111);
-      --muted: #7a7a7a;
+      --muted:#7a7a7a;
       --card: var(--tg-theme-secondary-bg-color,#f7f7f7);
       --primary: var(--tg-theme-button-color,#2ea6ff);
       --primary-fg: var(--tg-theme-button-text-color,#fff);
-      --radius: 16px;
-      --gap: 12px;
-      --shadow: 0 2px 12px rgba(0,0,0,.06);
-      --fs: 17px; /* یک درجه بزرگ‌تر */
+      --radius:16px; --gap:12px; --shadow:0 2px 12px rgba(0,0,0,.06); --fs:17px;
     }
     *{box-sizing:border-box}
     body{font-family:system-ui,Segoe UI,Roboto,sans-serif;font-size:var(--fs);margin:0;background:var(--bg);color:var(--fg)}
-    .wrap{max-width:980px;margin:0 auto;padding:16px}
+    /* padding-top بیشتر تا زیر دکمه‌های تلگرام بره */
+    .wrap{max-width:980px;margin:0 auto;padding:32px 16px 16px}
     .header{display:flex;align-items:center;gap:8px;margin-bottom:12px}
     .back{display:none}
     .back.show{display:inline-flex}
@@ -56,7 +53,7 @@
     .sold{color:#0a7a12;font-weight:700}
 
     /* FAB ورود مدیران */
-    .fab{position:fixed;right:16px;bottom:16px}
+    .fab{position:fixed;right:16px;bottom:16px;z-index:10}
     .fab .btn{padding:12px 16px;border-radius:999px}
 
     /* مدال تصویر با دکمه بازگشت */
@@ -67,8 +64,6 @@
 </head>
 <body>
 <div class="wrap">
-
-  <!-- هدر و دکمه بازگشت -->
   <div class="header">
     <div class="back" id="backWrap"><button id="backBtn">بازگشت</button></div>
     <div>
@@ -77,10 +72,8 @@
     </div>
   </div>
 
-  <!-- محتوای پویا -->
   <div id="view"></div>
 
-  <!-- دکمه شناور ورود مدیران -->
   <div class="fab" id="fabLogin"><button class="btn btn-outline" id="openLogin">ورود مدیران</button></div>
 </div>
 
@@ -96,73 +89,73 @@
 (function(){
   const tg = window.Telegram?.WebApp; tg?.expand();
 
-  // ---------- Supabase Client (public) ----------
+  // ---------- Supabase Client ----------
   let SUPA=null;
   async function initSupabase(){
     const r = await fetch('/api/public'); const j = await r.json();
     SUPA = window.supabase.createClient(j.supabaseUrl, j.supabaseAnon);
   }
 
-  // ---------- State & helpers ----------
+  // ---------- State ----------
   const state = {
-    page: 'home',          // home | login | admin | admin.content | admin.new | admin.edit | admin.delete
-    role: 'public',        // public | editor | owner
-    username: '',
-    token: '',
-    config: { welcome_text:'', menu:[], blocks:[] },
-    uploads: []
+    page:'home', role:'public', username:'', token:'',
+    config:{ welcome_text:'', menu:[], blocks:[] },
+    uploads:[]
   };
-  const $ = s => document.querySelector(s);
-  const view = $('#view');
-  const backWrap = $('#backWrap');
+  const $ = s=>document.querySelector(s);
+  const view = $('#view'), backWrap=$('#backWrap');
 
-  function esc(s){ return String(s||'').replace(/[&<>"']/g, m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m])); }
-  function priceTxt(x){ if(!x) return '—'; return (Number(x)/1e9).toFixed(2).replace(/\.00$/,'')+' میلیارد'; }
+  const BRANDS = {
+    "Volvo":["FH","FM","FMX","F12","F16"],
+    "Scania":["R","S","P","G","T"],
+    "Mercedes-Benz":["Actros","Axor","Atego"],
+    "MAN":["TGX","TGS","TGA","F2000"],
+    "DAF":["XF","CF","LF"],
+    "Iveco":["Stralis","Trakker","Eurocargo"],
+    "Renault":["T","C","K","Magnum","Premium"],
+    "Kamaz":["5490","6520","6460"],
+    "Howo":["A7","T7H","T5G"],
+    "FAW":["JH6","J5P"],
+    "Dongfeng":["KX","KL","KC"],
+    "Shacman":["X3000","X5000","M3000"]
+  };
+
+  function esc(s){ return String(s||'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m])); }
+  function priceTxt(x){ if(!x) return '—'; return Number(x).toLocaleString('fa-IR')+' تومان'; }
 
   function setPage(p){ state.page=p; render(); }
   $('#backBtn').onclick = ()=>{
     if($('#imgModal').style.display==='flex'){ $('#imgModal').style.display='none'; return; }
-    // مسیرهای بازگشت
-    if(state.page.startsWith('admin.') ) setPage('admin');
+    if(state.page.startsWith('admin.')) setPage('admin');
     else if(state.page==='login') setPage('home');
   };
 
   // ---------- API ----------
   async function getMe(){
-    const init = tg?.initData || '';
-    const q = new URLSearchParams({ initData:init, token:state.token }).toString();
-    const r = await fetch('/api/me?'+q); const j = await r.json();
+    const q = new URLSearchParams({ initData: tg?.initData||'', token: state.token }).toString();
+    const j = await (await fetch('/api/me?'+q)).json();
     state.role = j.role || 'public';
     state.username = j.username || '';
-    $('#fabLogin').style.display = j.is_admin ? 'none' : 'block';
+    // اگه ادمین هست → مستقیماً منوی ادمین
+    if(j.is_admin){ $('#fabLogin').style.display='none'; setPage('admin'); }
+    else { $('#fabLogin').style.display='block'; setPage('home'); }
   }
   async function loginEditor(u,p){
-    const r = await fetch('/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:u,password:p})});
-    const j = await r.json();
+    const j = await (await fetch('/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:u,password:p})})).json();
     if(j.ok){ state.token=j.token; state.role=j.role; state.username=u; setPage('admin'); }
     else alert('یوزر/رمز نامعتبر است');
   }
-  async function loadConfig(){
-    const r = await fetch('/api/config'); const j = await r.json();
-    state.config = Object.assign({welcome_text:'',menu:[],blocks:[]}, j||{});
-  }
-  async function getPosts(params){
-    const r = await fetch('/api/posts?'+new URLSearchParams(params).toString());
-    return (await r.json()).items || [];
-  }
+  async function loadConfig(){ const j = await (await fetch('/api/config')).json(); state.config = Object.assign({welcome_text:'',menu:[],blocks:[]}, j||{}); }
+  async function getPosts(params){ const j = await (await fetch('/api/posts?'+new URLSearchParams(params))).json(); return j.items||[]; }
   async function savePost(payload){
-    const r = await fetch('/api/posts',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ initData: tg?.initData||'', payload, editorUser: (state.role==='editor'? state.username:undefined) })});
-    return await r.json();
+    return await (await fetch('/api/posts',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ initData: tg?.initData||'', payload, editorUser:(state.role==='editor'?state.username:undefined) })})).json();
   }
   async function deletePost(id){
-    const r = await fetch('/api/posts',{method:'DELETE',headers:{'Content-Type':'application/json'},body:JSON.stringify({ initData: tg?.initData||'', id })});
-    return await r.json();
+    return await (await fetch('/api/posts',{method:'DELETE',headers:{'Content-Type':'application/json'},body:JSON.stringify({ initData: tg?.initData||'', id })})).json();
   }
-  // Signed upload
   async function uploadFileToSupabase(file){
-    const r1 = await fetch('/api/upload-url',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ filename:file.name, initData: tg?.initData||'', editorUser: (state.role==='editor'?state.username:undefined) })});
-    const j1 = await r1.json();
-    if(!j1.ok) { alert(j1.error||'upload error'); return null; }
+    const j1 = await (await fetch('/api/upload-url',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ filename:file.name, initData: tg?.initData||'', editorUser:(state.role==='editor'?state.username:undefined) })})).json();
+    if(!j1.ok){ alert(j1.error||'upload error'); return null; }
     const up = await SUPA.storage.from(j1.bucket).uploadToSignedUrl(j1.path, j1.token, file,{contentType:file.type||'application/octet-stream'});
     if(up.error){ alert(up.error.message); return null; }
     return j1.publicUrl;
@@ -174,13 +167,12 @@
     if(state.page==='home') return renderHome();
     if(state.page==='login'){ backWrap.classList.add('show'); return renderLogin(); }
     if(state.page==='admin'){ backWrap.classList.add('show'); return renderAdminMenu(); }
-    if(state.page==='admin.content'){ backWrap.classList.add('show'); return renderContentSettings(); }
     if(state.page==='admin.new'){ backWrap.classList.add('show'); return renderPostForm(); }
     if(state.page==='admin.edit'){ backWrap.classList.add('show'); return renderPostList('edit'); }
     if(state.page==='admin.delete'){ backWrap.classList.add('show'); return renderPostList('delete'); }
   }
 
-  // Home: خوشامد + لینک‌ها + فیلترها + لیست
+  // صفحه کاربر (فیلتر ساده + لیست)
   function renderHome(){
     const brandOptions = Object.keys(BRANDS).map(b=>`<option value="${esc(b)}">${esc(b)}</option>`).join('');
     view.innerHTML = `
@@ -200,18 +192,18 @@
         <label>برند</label>
         <select id="f_brand"><option value="">همه برندها</option>${brandOptions}</select>
         <label>سال ساخت</label>
-        <input id="f_year" type="number" placeholder="مثلاً 1398">
+        <input id="f_year" type="number" placeholder="مثلاً 2019">
 
         <label style="margin-top:10px">بازهٔ قیمت (تومان)</label>
         <div class="row">
-          <input id="r_min" type="range" min="0" max="20000000000" step="100000000">
-          <input id="r_max" type="range" min="0" max="20000000000" step="100000000">
+          <input id="r_min" type="range" min="0" max="20000000000" step="10000000">
+          <input id="r_max" type="range" min="0" max="20000000000" step="10000000">
         </div>
         <div class="row">
           <input id="f_min" type="number" placeholder="از" style="flex:1">
           <input id="f_max" type="number" placeholder="تا" style="flex:1">
         </div>
-        <div class="pill" id="priceLabel">۰ تا ۲۰,۰۰۰,000,000</div>
+        <div class="pill" id="priceLabel"></div>
 
         <div class="row" style="margin-top:10px">
           <button class="btn" id="apply">اعمال</button>
@@ -221,32 +213,28 @@
 
       <div class="card"><div id="posts"></div></div>
     `;
-    // bind sliders
-    const rmin = $('#r_min'), rmax=$('#r_max'), nmin=$('#f_min'), nmax=$('#f_max'), lbl=$('#priceLabel');
-    const sync = ()=>{
-      let a = Number(rmin.value), b = Number(rmax.value);
-      if(a>b){ const t=a; a=b; b=t; }
-      nmin.value = a||0; nmax.value = b||0;
-      lbl.textContent = formatMoney(a)+' تا '+formatMoney(b);
-    };
-    const formatMoney = v => (v/1e9).toFixed(1).replace('.0','')+' میلیارد';
-    rmin.oninput = sync; rmax.oninput = sync; sync();
+    // اسلایدرها + نمایش با جداکننده هزارگان
+    const rmin=$('#r_min'), rmax=$('#r_max'), nmin=$('#f_min'), nmax=$('#f_max'), lbl=$('#priceLabel');
+    const fmt=v=>Number(v).toLocaleString('fa-IR');
+    const sync=()=>{ let a=+rmin.value, b=+rmax.value; if(a>b){[a,b]=[b,a];} nmin.value=a; nmax.value=b; lbl.textContent=`${fmt(a)} تا ${fmt(b)} تومان`; };
+    rmin.oninput=sync; rmax.oninput=sync; sync();
+
     $('#apply').onclick = ()=> loadAndRenderPosts();
     $('#reset').onclick = ()=>{ $('#f_brand').value=''; $('#f_year').value=''; rmin.value=0; rmax.value=20000000000; sync(); loadAndRenderPosts(); };
     loadAndRenderPosts();
   }
 
   async function loadAndRenderPosts(){
-    const params = {};
+    const params={};
     if($('#f_brand')){ const b=$('#f_brand').value; if(b) params.brand=b; }
     if($('#f_year')){ const y=$('#f_year').value; if(y) params.year=y; }
     if($('#f_min')){ const mi=$('#f_min').value; if(mi) params.minp=mi; }
     if($('#f_max')){ const ma=$('#f_max').value; if(ma) params.maxp=ma; }
     const items = await getPosts(params);
-    const box = $('#posts'); box.innerHTML='';
+    const box=$('#posts'); box.innerHTML='';
     items.forEach(p=>{
-      const el = document.createElement('div'); el.className='item';
-      el.innerHTML = `
+      const el=document.createElement('div'); el.className='item';
+      el.innerHTML=`
         <div style="display:flex;justify-content:space-between;align-items:center">
           <div><b>${esc(p.brand||'')} ${esc(p.subbrand||'')}</b> <span class="pill">سال ${p.year||'—'}</span></div>
           <div>${p.sold?'<span class="sold">✅ فروخته شده است</span>':''}</div>
@@ -257,15 +245,14 @@
         <div class="row" style="margin-top:8px">
           ${p.insta_url?`<a class="btn" href="${esc(p.insta_url)}" target="_blank">مشاهده در اینستاگرام</a>`:''}
           <a class="btn btn-outline" href="tel:09121314226">تماس با مشاور</a>
-        </div>
-      `;
-      const g = el.querySelector('.gallery');
+        </div>`;
+      const g=el.querySelector('.gallery');
       (p.images||[]).forEach(u=>{ const im=new Image(); im.src=u; im.onclick=()=>openModal(u); g.appendChild(im); });
       box.appendChild(el);
     });
   }
 
-  // Login page
+  // صفحه‌ی لاگین
   function renderLogin(){
     view.innerHTML = `
       <div class="card">
@@ -279,139 +266,24 @@
             <button class="btn btn-outline" id="cancelLogin">انصراف</button>
           </div>
         </div>
-      </div>
-    `;
+      </div>`;
     $('#doLogin').onclick = ()=> loginEditor($('#lu').value.trim(), $('#lp').value);
     $('#cancelLogin').onclick = ()=> setPage('home');
   }
   $('#openLogin').onclick = ()=> setPage('login');
 
-  // Admin main menu
+  // منوی ادمین (سه آیتم جدا)
   function renderAdminMenu(){
     view.innerHTML = `
-      <a class="square" id="m_content"><div class="title">تنظیمات محتوا</div><div class="hint">منوها و بلوک‌ها (Drag & Drop)</div></a>
       <a class="square" id="m_new"><div class="title">پست جدید</div><div class="hint">افزودن آگهی با آپلود تصاویر</div></a>
       <a class="square" id="m_edit"><div class="title">ویرایش پست‌ها</div><div class="hint">لیست کامل برای ویرایش</div></a>
-      <a class="square" id="m_delete"><div class="title">حذف پست‌ها</div><div class="hint">فقط Owner می‌تواند حذف کند</div></a>
-    `;
-    $('#m_content').onclick = ()=> setPage('admin.content');
-    $('#m_new').onclick     = ()=> setPage('admin.new');
-    $('#m_edit').onclick    = ()=> setPage('admin.edit');
-    $('#m_delete').onclick  = ()=> setPage('admin.delete');
+      <a class="square" id="m_delete"><div class="title">حذف پست‌ها</div><div class="hint">فقط Owner می‌تواند حذف کند</div></a>`;
+    $('#m_new').onclick = ()=> setPage('admin.new');
+    $('#m_edit').onclick = ()=> setPage('admin.edit');
+    $('#m_delete').onclick = ()=> setPage('admin.delete');
   }
 
-  // Content settings (menu + blocks)
-  function renderContentSettings(){
-    const menuLis = (state.config.menu||[]).map((it,i)=>`
-      <li class="item" data-i="${i}">
-        <div class="row" style="align-items:center">
-          <span class="handle">☰</span>
-          <div style="flex:1"><b>${esc(it.title)}</b><div class="pill">${esc(it.path)}</div></div>
-          <button class="btn btn-outline" data-act="edit">ویرایش</button>
-          <button class="btn btn-outline" data-act="del">حذف</button>
-        </div>
-      </li>`).join('');
-    const blocks = (state.config.blocks||[]).map((b,i)=>`
-      <div class="item" data-i="${i}">
-        <div class="row" style="align-items:center">
-          <span class="handle">☰</span>
-          <div style="flex:1">${blockSummary(b)}</div>
-          <button class="btn btn-outline" data-edit="1">ویرایش</button>
-          <button class="btn btn-outline" data-del="1">حذف</button>
-        </div>
-      </div>`).join('');
-
-    view.innerHTML = `
-      <div class="card">
-        <label>متن خوش‌آمد</label>
-        <textarea id="welcomeInput" rows="2">${esc(state.config.welcome_text)}</textarea>
-      </div>
-
-      <div class="card">
-        <div class="title" style="font-weight:700;margin-bottom:6px">منو</div>
-        <ul id="menuBox">${menuLis||'<div class="pill">منویی تعریف نشده</div>'}</ul>
-        <div class="row">
-          <input id="newTitle" placeholder="عنوان">
-          <input id="newPath" placeholder="مسیر مثل / یا /about">
-          <button class="btn" id="addItem">افزودن آیتم</button>
-        </div>
-      </div>
-
-      <div class="card">
-        <div class="title" style="font-weight:700;margin-bottom:6px">بلوک‌ها</div>
-        <div id="blocksBox">${blocks||'<div class="pill">بلوکی تعریف نشده</div>'}</div>
-        <div class="row">
-          <select id="blockType"><option value="text">متن</option><option value="image">تصویر</option><option value="button">دکمه</option></select>
-          <button class="btn" id="addBlock">افزودن بلوک</button>
-        </div>
-      </div>
-
-      <div class="row" style="margin-top:8px">
-        <button class="btn" id="saveCfg">ذخیره تنظیمات</button>
-      </div>
-    `;
-
-    // Sortables
-    new Sortable($('#menuBox'),{handle:'.handle',animation:150,onEnd:()=>{
-      const items=[...$('#menuBox').querySelectorAll('li')];
-      state.config.menu = items.map(li=>{
-        const i = Number(li.dataset.i); return state.config.menu[i];
-      });
-      renderContentSettings();
-    }});
-    new Sortable($('#blocksBox'),{handle:'.handle',animation:150,onEnd:()=>{
-      const items=[...$('#blocksBox').children];
-      state.config.blocks = items.map(el=>{
-        const i = Number(el.dataset.i); return state.config.blocks[i];
-      });
-      renderContentSettings();
-    }});
-
-    // menu actions
-    $('#menuBox').onclick = e=>{
-      const li = e.target.closest('li'); if(!li) return;
-      const i = Number(li.dataset.i);
-      if(e.target.dataset.act==='del'){ state.config.menu.splice(i,1); renderContentSettings(); }
-      if(e.target.dataset.act==='edit'){
-        const t=prompt('عنوان', state.config.menu[i].title); if(t==null)return;
-        const p=prompt('مسیر', state.config.menu[i].path); if(p==null)return;
-        state.config.menu[i] = {title:t, path:p}; renderContentSettings();
-      }
-    };
-    $('#addItem').onclick = ()=>{ const t=$('#newTitle').value.trim(); const p=$('#newPath').value.trim(); if(!t)return; state.config.menu.push({title:t,path:p||'/'}); renderContentSettings(); };
-
-    // blocks actions
-    $('#blocksBox').onclick = e=>{
-      const el = e.target.closest('.item'); if(!el) return;
-      const i = Number(el.dataset.i);
-      if(e.target.hasAttribute('data-del')){ state.config.blocks.splice(i,1); renderContentSettings(); }
-      if(e.target.hasAttribute('data-edit')){ editBlock(state.config.blocks[i], nb=>{ state.config.blocks[i]=nb; renderContentSettings(); }); }
-    };
-    $('#addBlock').onclick = ()=>{
-      const t=$('#blockType').value;
-      const def = t==='text'?{type:'text',text:'متن نمونه'}: t==='image'?{type:'image',url:'https://placehold.co/800x400',alt:'',caption:''}:{type:'button',text:'بزن بریم',href:'/go'};
-      state.config.blocks.push(def); renderContentSettings();
-    };
-
-    $('#saveCfg').onclick = async ()=>{
-      const r = await fetch('/api/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ initData: tg?.initData||'', config: state.config })});
-      const j = await r.json();
-      alert(j.ok?'ذخیره شد ✅':('خطا: '+(j.error||'')));
-    };
-  }
-  function blockSummary(b){
-    if(b.type==='text') return `<b>متن:</b> <span class="pill">${esc((b.text||'').slice(0,80))}</span>`;
-    if(b.type==='image') return `<b>تصویر:</b> <span class="pill">${esc(b.url||'')}</span>`;
-    if(b.type==='button') return `<b>دکمه:</b> ${esc(b.text||'')} → <span class="pill">${esc(b.href||'')}</span>`;
-    return 'Unknown';
-  }
-  function editBlock(b,onSave){
-    if(b.type==='text'){ const t=prompt('متن:', b.text||''); if(t==null)return; onSave({type:'text',text:t}); }
-    if(b.type==='image'){ const u=prompt('URL تصویر:', b.url||''); if(u==null)return; const alt=prompt('ALT:', b.alt||''); if(alt==null)return; const cap=prompt('کپشن:', b.caption||''); if(cap==null)return; onSave({type:'image',url:u,alt,caption:cap}); }
-    if(b.type==='button'){ const t=prompt('متن دکمه:', b.text||''); if(t==null)return; const h=prompt('Href (مثلاً /go):', b.href||''); if(h==null)return; onSave({type:'button',text:t,href:h}); }
-  }
-
-  // New Post
+  // فرم پست جدید (همان قبلی، بدون فیلتر)
   function renderPostForm(){
     view.innerHTML = `
       <div class="card">
@@ -422,7 +294,7 @@
           <input id="p_subbrand" placeholder="سری/مدل (مثلاً FH)">
         </div>
         <div class="row">
-          <input id="p_year" type="number" placeholder="سال">
+          <input id="p_year" type="number" placeholder="سال (مثلاً 2019)">
           <input id="p_price" type="number" placeholder="قیمت (تومان)">
           <input id="p_mileage" type="number" placeholder="کارکرد (کیلومتر)">
         </div>
@@ -436,20 +308,14 @@
         <div class="row" style="margin-top:10px">
           <button class="btn" id="savePost">ثبت/ذخیره</button>
         </div>
-      </div>
-    `;
+      </div>`;
     $('#p_images').onchange = async (e)=>{
       const files = Array.from(e.target.files||[]);
-      for(const f of files){
-        const url = await uploadFileToSupabase(f);
-        if(url) state.uploads.push({url});
-      }
+      state.uploads=[];
+      for(const f of files){ const url=await uploadFileToSupabase(f); if(url) state.uploads.push({url}); }
       renderUploadPreview();
     };
-    function renderUploadPreview(){
-      const g=$('#p_gallery'); g.innerHTML='';
-      state.uploads.forEach(u=>{ const im=new Image(); im.src=u.url; im.onclick=()=>openModal(u.url); g.appendChild(im); });
-    }
+    function renderUploadPreview(){ const g=$('#p_gallery'); g.innerHTML=''; state.uploads.forEach(u=>{ const im=new Image(); im.src=u.url; im.onclick=()=>openModal(u.url); g.appendChild(im); }); }
     $('#savePost').onclick = async ()=>{
       const payload = {
         title: $('#p_title').value, brand: $('#p_brand').value, subbrand: $('#p_subbrand').value,
@@ -462,7 +328,7 @@
     };
   }
 
-  // Edit/Delete lists
+  // لیست ویرایش/حذف
   async function renderPostList(mode){
     const items = await getPosts({});
     view.innerHTML = items.map(p=>`
@@ -475,22 +341,17 @@
       </div>
     `).join('') || '<div class="pill">موردی یافت نشد.</div>';
 
-    view.onclick = async (e)=>{
-      const id = e.target.dataset.edit || e.target.dataset.del;
-      if(!id) return;
+    view.onclick = async e=>{
+      const id = e.target.dataset.edit || e.target.dataset.del; if(!id) return;
       if(e.target.dataset.edit){
-        // لود برای فرم «پست جدید»
         const p = items.find(x=>x.id==id);
         setPage('admin.new');
-        // کمی صبر تا صفحه رندر شود
         setTimeout(()=>{
           $('#p_title').value=p.title||''; $('#p_brand').value=p.brand||''; $('#p_subbrand').value=p.subbrand||'';
           $('#p_year').value=p.year||''; $('#p_price').value=p.price_toman||''; $('#p_mileage').value=p.mileage_km||'';
           $('#p_insta').value=p.insta_url||''; $('#p_desc').value=p.description||'';
-          state.uploads = (p.images||[]).map(u=>({url:u}));
-          // پیش‌نمایش
+          state.uploads=(p.images||[]).map(u=>({url:u}));
           const g=$('#p_gallery'); g.innerHTML=''; state.uploads.forEach(u=>{ const im=new Image(); im.src=u.url; im.onclick=()=>openModal(u.url); g.appendChild(im); });
-          // ذخیره با id
           $('#savePost').onclick = async ()=>{
             const payload = {
               id:p.id,
@@ -515,32 +376,15 @@
     };
   }
 
-  // modal image
+  // مدال تصویر + بازگشت
   function openModal(url){ $('#modalImg').src=url; $('#imgModal').style.display='flex'; }
   $('#modalClose').onclick = ()=> $('#imgModal').style.display='none';
 
-  // برندها
-  const BRANDS = {
-    "Volvo":["FH","FM","FMX","F12","F16"],
-    "Scania":["R","S","P","G","T"],
-    "Mercedes-Benz":["Actros","Axor","Atego"],
-    "MAN":["TGX","TGS","TGA","F2000"],
-    "DAF":["XF","CF","LF"],
-    "Iveco":["Stralis","Trakker","Eurocargo"],
-    "Renault":["T","C","K","Magnum","Premium"],
-    "Kamaz":["5490","6520","6460"],
-    "Howo":["A7","T7H","T5G"],
-    "FAW":["JH6","J5P"],
-    "Dongfeng":["KX","KL","KC"],
-    "Shacman":["X3000","X5000","M3000"]
-  };
-
-  // boot
+  // شروع
   (async ()=>{
     await initSupabase();
-    await getMe();
     await loadConfig();
-    render();
+    await getMe();   // خودش بسته به نقش، صفحه مناسب رو setPage می‌کند
   })();
 })();
 </script>
