@@ -3,203 +3,521 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>بازار ماشین‌های سنگین</title>
+  <title>نمایشگاه کامیون و کشنده میرآخورلی</title>
 
-  <!-- Supabase JS (برای کلاینت فرانت) -->
+  <!-- کتابخانه‌ها -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <!-- Telegram SDK و SortableJS -->
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
 
   <style>
-    body{font-family:sans-serif;margin:0;padding:16px;background:var(--tg-theme-bg-color,#fff);color:var(--tg-theme-text-color,#111)}
-    .wrap{max-width:980px;margin:0 auto}
-    .grid{display:grid;grid-template-columns:1fr;gap:12px}
-    @media(min-width:900px){ .grid{grid-template-columns: 300px 1fr} }
-    .card{background:var(--tg-theme-secondary-bg-color,#f5f5f5);border-radius:16px;padding:12px;box-shadow:0 2px 10px rgba(0,0,0,.06)}
-    h1{margin:0 0 8px}
-    h2{margin:8px 0;font-size:16px;opacity:.85}
-    label{display:block;margin-top:8px}
-    input,select,textarea{width:100%;padding:8px;border-radius:10px;border:1px solid #ddd;background:transparent;color:inherit}
-    button{padding:10px 14px;border-radius:10px;border:0;cursor:pointer}
-    .btn{background:var(--tg-theme-button-color,#2ea6ff);color:var(--tg-theme-button-text-color,#fff)}
-    .pill{font-size:12px;opacity:.8}
-    .item{border:1px solid #ddd;border-radius:12px;padding:10px;margin:8px 0;background:rgba(0,0,0,.02)}
+    :root{
+      --bg: var(--tg-theme-bg-color,#fff);
+      --fg: var(--tg-theme-text-color,#111);
+      --muted: #7a7a7a;
+      --card: var(--tg-theme-secondary-bg-color,#f7f7f7);
+      --primary: var(--tg-theme-button-color,#2ea6ff);
+      --primary-fg: var(--tg-theme-button-text-color,#fff);
+      --radius: 16px;
+      --gap: 12px;
+      --shadow: 0 2px 12px rgba(0,0,0,.06);
+      --fs: 17px; /* یک درجه بزرگ‌تر */
+    }
+    *{box-sizing:border-box}
+    body{font-family:system-ui,Segoe UI,Roboto,sans-serif;font-size:var(--fs);margin:0;background:var(--bg);color:var(--fg)}
+    .wrap{max-width:980px;margin:0 auto;padding:16px}
+    .header{display:flex;align-items:center;gap:8px;margin-bottom:12px}
+    .back{display:none}
+    .back.show{display:inline-flex}
+    .back button{border:0;background:var(--card);padding:8px 12px;border-radius:10px;box-shadow:var(--shadow);cursor:pointer}
+    h1{margin:0 0 4px 0;font-size:20px}
+    .sub{color:var(--muted);margin-bottom:10px}
+
+    .card{background:var(--card);border-radius:var(--radius);padding:14px;box-shadow:var(--shadow);margin:12px 0}
+
+    .btn{display:inline-flex;align-items:center;justify-content:center;border:0;cursor:pointer;border-radius:12px;padding:12px 14px;background:var(--primary);color:var(--primary-fg);text-decoration:none;box-shadow:var(--shadow);transition:transform .05s}
+    .btn:active{transform:translateY(1px)}
+    .btn-outline{background:transparent;color:var(--fg);border:1px solid #ddd}
+    .square{display:block;padding:16px;border-radius:14px;background:var(--card);box-shadow:var(--shadow);text-decoration:none;color:inherit}
+    .square+.square{margin-top:10px}
+    .square .title{font-weight:600;margin-bottom:6px}
+    .square .hint{font-size:13px;color:var(--muted)}
+    .grid-2{display:grid;grid-template-columns:1fr;gap:var(--gap)}
+    @media(min-width:800px){ .grid-2{grid-template-columns:1fr 1fr} }
+
     .row{display:flex;gap:8px;flex-wrap:wrap}
-    .hidden{display:none}
+    label{display:block;margin-top:8px}
+    input,select,textarea{width:100%;padding:10px;border-radius:12px;border:1px solid #ddd;background:transparent;color:inherit}
+    .pill{font-size:13px;color:var(--muted)}
+
     .gallery{display:flex;gap:6px;overflow:auto}
-    .gallery img{height:64px;border-radius:8px;cursor:zoom-in}
-    .modal{position:fixed;inset:0;background:rgba(0,0,0,.8);display:none;align-items:center;justify-content:center}
-    .modal img{max-width:95vw;max-height:90vh;border-radius:8px}
-    .handle{cursor:grab;font-weight:bold;padding:0 8px}
-    #debug{font:12px monospace;opacity:.8;white-space:pre-wrap;direction:ltr}
-    .sold{color:#0a7a12;font-weight:bold}
-    .filters .row>div{flex:1;min-width:120px}
+    .gallery img{height:68px;border-radius:10px;cursor:zoom-in}
+    .item{border:1px solid #e6e6e6;border-radius:14px;padding:12px;margin:10px 0;background:rgba(0,0,0,.02)}
+    .sold{color:#0a7a12;font-weight:700}
+
+    /* FAB ورود مدیران */
+    .fab{position:fixed;right:16px;bottom:16px}
+    .fab .btn{padding:12px 16px;border-radius:999px}
+
+    /* مدال تصویر با دکمه بازگشت */
+    .modal{position:fixed;inset:0;background:rgba(0,0,0,.8);display:none;align-items:center;justify-content:center;z-index:50}
+    .modal .box{max-width:95vw;max-height:90vh;display:flex;flex-direction:column;gap:8px;align-items:center}
+    .modal img{max-width:95vw;max-height:80vh;border-radius:12px}
   </style>
 </head>
 <body>
 <div class="wrap">
 
-  <div class="card"><h1>بازار کامیون و کشنده</h1><div id="welcome" class="pill"></div></div>
-
-  <div class="grid">
-    <!-- فیلترها -->
-    <div class="card filters">
-      <h2>فیلترها</h2>
-      <div class="row">
-        <div>
-          <label>برند</label>
-          <select id="f_brand"></select>
-        </div>
-        <div>
-          <label>سال</label>
-          <input id="f_year" type="number" placeholder="مثلاً 1398">
-        </div>
-      </div>
-      <div class="row">
-        <div>
-          <label>قیمت از (میلیارد)</label>
-          <input id="f_min" type="number" min="0" max="20" step="0.1" placeholder="0">
-        </div>
-        <div>
-          <label>تا (میلیارد)</label>
-          <input id="f_max" type="number" min="0" max="20" step="0.1" placeholder="20">
-        </div>
-      </div>
-      <div class="row">
-        <label><input type="checkbox" id="f_used"> کارکرده</label>
-        <label><input type="checkbox" id="f_zero"> صفر</label>
-      </div>
-      <div class="row">
-        <label><input type="checkbox" id="f_birang"> بی‌رنگ</label>
-        <label><input type="checkbox" id="f_bedun"> بدون آبرنگ</label>
-      </div>
-      <div class="row">
-        <label><input type="checkbox" id="f_retarder"> ریتارد</label>
-        <label><input type="checkbox" id="f_intarder"> اینتارد</label>
-      </div>
-      <div class="row" style="margin-top:8px">
-        <button class="btn" id="applyFilters">اعمال</button>
-        <button id="resetFilters">ریست</button>
-      </div>
-
-      <h2 style="margin-top:16px">لینک‌ها</h2>
-      <div class="row">
-        <a class="btn" href="https://instagram.com/truck.mirakhorli" target="_blank" style="text-decoration:none;text-align:center;flex:1">پیج اینستاگرام</a>
-        <a class="btn" href="tel:09121314226" style="text-decoration:none;text-align:center;flex:1">تماس با مشاور</a>
-      </div>
-    </div>
-
-    <!-- لیست پست‌ها -->
-    <div class="card">
-      <div id="posts"></div>
+  <!-- هدر و دکمه بازگشت -->
+  <div class="header">
+    <div class="back" id="backWrap"><button id="backBtn">بازگشت</button></div>
+    <div>
+      <h1>نمایشگاه کامیون و کشنده میرآخورلی</h1>
+      <div class="sub">درود بر شما. به اپلیکیشن تلگرامی Truck Mirakhorli خوش آمدید.</div>
     </div>
   </div>
 
-  <!-- پنل ادمین -->
-  <div id="adminPanel" class="card hidden">
-    <h2>پنل ادمین 👑</h2>
+  <!-- محتوای پویا -->
+  <div id="view"></div>
 
-    <div class="row">
-      <button id="adminLoginBtn">ورود ادمین (username/password)</button>
-      <span id="adminLoginStatus" class="pill"></span>
-    </div>
-
-    <h3>تنظیمات محتوا</h3>
-    <label>متن خوش‌آمد</label>
-    <textarea id="welcomeInput" rows="2"></textarea>
-
-    <h4 class="pill">منو (Drag & Drop)</h4>
-    <ul id="menuEditor"></ul>
-    <div class="row">
-      <input id="newTitle" placeholder="عنوان منو"/>
-      <input id="newPath" placeholder="مسیر مثل / یا /about"/>
-      <button id="addItemBtn">افزودن آیتم</button>
-    </div>
-
-    <h4 class="pill" style="margin-top:12px">بلوک‌ها (Drag & Drop)</h4>
-    <div id="blocksEditor"></div>
-    <div class="row">
-      <select id="blockType">
-        <option value="text">متن</option><option value="image">تصویر</option><option value="button">دکمه</option>
-      </select>
-      <button id="addBlockBtn">افزودن بلوک</button>
-    </div>
-
-    <div class="row" style="margin-top:8px">
-      <button class="btn" id="saveConfig">ذخیره تنظیمات</button>
-      <span id="saveConfigStatus" class="pill"></span>
-    </div>
-
-    <hr/>
-
-    <h3>پست جدید / ویرایش</h3>
-    <div class="row">
-      <input id="p_id" type="hidden">
-      <input id="p_title" placeholder="عنوان">
-      <input id="p_brand" placeholder="برند (مثلاً Volvo)">
-      <input id="p_subbrand" placeholder="سری/مدل (مثلاً FH)">
-    </div>
-    <div class="row">
-      <input id="p_year" type="number" placeholder="سال">
-      <input id="p_price" type="number" placeholder="قیمت (تومان)">
-      <input id="p_mileage" type="number" placeholder="کارکرد (کیلومتر)">
-    </div>
-    <div class="row">
-      <label><input type="checkbox" id="p_used" checked> کارکرده</label>
-      <label><input type="checkbox" id="p_birang"> بی‌رنگ</label>
-      <label><input type="checkbox" id="p_bedun"> بدون آبرنگ</label>
-      <label><input type="checkbox" id="p_retarder"> ریتارد</label>
-      <label><input type="checkbox" id="p_intarder"> اینتارد</label>
-      <label><input type="checkbox" id="p_sold"> فروخته‌شده</label>
-    </div>
-    <label>لینک پست اینستاگرام</label>
-    <input id="p_insta" placeholder="https://instagram.com/....">
-    <label>توضیحات</label>
-    <textarea id="p_desc" rows="3"></textarea>
-
-    <label>تصاویر (درگ‌اَند‌دراپ یا انتخاب فایل)</label>
-    <input id="p_images" type="file" multiple accept="image/*">
-    <div id="p_gallery" class="gallery"></div>
-
-    <div class="row" style="margin-top:8px">
-      <button class="btn" id="savePost">ثبت/ذخیره</button>
-      <span id="savePostStatus" class="pill"></span>
-    </div>
-
-    <h3>رمزساز (فقط Owner)</h3>
-    <div class="row">
-      <button id="genPwd" class="btn">ساخت یوزرنیم/پسورد ادمین ویرایشگر</button>
-      <input id="rvkUser" placeholder="username برای revoke">
-      <button id="revokeBtn">Revoke</button>
-      <span id="genStatus" class="pill"></span>
-    </div>
-
-    <h3>نمودار رویدادها (بازدید/کلیک)</h3>
-    <div id="stats" class="pill">به‌زودی (Data در audit_logs ذخیره می‌شود)</div>
-  </div>
-
-  <div id="debug" class="card">starting…</div>
+  <!-- دکمه شناور ورود مدیران -->
+  <div class="fab" id="fabLogin"><button class="btn btn-outline" id="openLogin">ورود مدیران</button></div>
 </div>
 
-<!-- مدال بزرگ‌نمایی -->
-<div id="modal" class="modal" onclick="this.style.display='none'">
-  <img id="modalImg" src="">
+<!-- مدال تصویر -->
+<div id="imgModal" class="modal">
+  <div class="box">
+    <img id="modalImg" src="">
+    <button class="btn btn-outline" id="modalClose">بازگشت</button>
+  </div>
 </div>
 
 <script>
 (function(){
   const tg = window.Telegram?.WebApp; tg?.expand();
-  const debug = (...a)=>{ const el=document.getElementById('debug'); el.textContent += '\n'+a.map(x=>{try{return typeof x==='string'?x:JSON.stringify(x)}catch{return String(x)}}).join(' '); };
-  const $ = s => document.querySelector(s);
 
-  // کلاینت Supabase برای فرانت (بخش «ب»)
-  let SUPA = null;
-  async function initSupabaseClient(){
-    const r = await fetch('/api/public');
-    const j = await r.json();
+  // ---------- Supabase Client (public) ----------
+  let SUPA=null;
+  async function initSupabase(){
+    const r = await fetch('/api/public'); const j = await r.json();
     SUPA = window.supabase.createClient(j.supabaseUrl, j.supabaseAnon);
   }
+
+  // ---------- State & helpers ----------
+  const state = {
+    page: 'home',          // home | login | admin | admin.content | admin.new | admin.edit | admin.delete
+    role: 'public',        // public | editor | owner
+    username: '',
+    token: '',
+    config: { welcome_text:'', menu:[], blocks:[] },
+    uploads: []
+  };
+  const $ = s => document.querySelector(s);
+  const view = $('#view');
+  const backWrap = $('#backWrap');
+
+  function esc(s){ return String(s||'').replace(/[&<>"']/g, m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m])); }
+  function priceTxt(x){ if(!x) return '—'; return (Number(x)/1e9).toFixed(2).replace(/\.00$/,'')+' میلیارد'; }
+
+  function setPage(p){ state.page=p; render(); }
+  $('#backBtn').onclick = ()=>{
+    if($('#imgModal').style.display==='flex'){ $('#imgModal').style.display='none'; return; }
+    // مسیرهای بازگشت
+    if(state.page.startsWith('admin.') ) setPage('admin');
+    else if(state.page==='login') setPage('home');
+  };
+
+  // ---------- API ----------
+  async function getMe(){
+    const init = tg?.initData || '';
+    const q = new URLSearchParams({ initData:init, token:state.token }).toString();
+    const r = await fetch('/api/me?'+q); const j = await r.json();
+    state.role = j.role || 'public';
+    state.username = j.username || '';
+    $('#fabLogin').style.display = j.is_admin ? 'none' : 'block';
+  }
+  async function loginEditor(u,p){
+    const r = await fetch('/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:u,password:p})});
+    const j = await r.json();
+    if(j.ok){ state.token=j.token; state.role=j.role; state.username=u; setPage('admin'); }
+    else alert('یوزر/رمز نامعتبر است');
+  }
+  async function loadConfig(){
+    const r = await fetch('/api/config'); const j = await r.json();
+    state.config = Object.assign({welcome_text:'',menu:[],blocks:[]}, j||{});
+  }
+  async function getPosts(params){
+    const r = await fetch('/api/posts?'+new URLSearchParams(params).toString());
+    return (await r.json()).items || [];
+  }
+  async function savePost(payload){
+    const r = await fetch('/api/posts',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ initData: tg?.initData||'', payload, editorUser: (state.role==='editor'? state.username:undefined) })});
+    return await r.json();
+  }
+  async function deletePost(id){
+    const r = await fetch('/api/posts',{method:'DELETE',headers:{'Content-Type':'application/json'},body:JSON.stringify({ initData: tg?.initData||'', id })});
+    return await r.json();
+  }
+  // Signed upload
+  async function uploadFileToSupabase(file){
+    const r1 = await fetch('/api/upload-url',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ filename:file.name, initData: tg?.initData||'', editorUser: (state.role==='editor'?state.username:undefined) })});
+    const j1 = await r1.json();
+    if(!j1.ok) { alert(j1.error||'upload error'); return null; }
+    const up = await SUPA.storage.from(j1.bucket).uploadToSignedUrl(j1.path, j1.token, file,{contentType:file.type||'application/octet-stream'});
+    if(up.error){ alert(up.error.message); return null; }
+    return j1.publicUrl;
+  }
+
+  // ---------- Views ----------
+  function render(){
+    backWrap.classList.remove('show');
+    if(state.page==='home') return renderHome();
+    if(state.page==='login'){ backWrap.classList.add('show'); return renderLogin(); }
+    if(state.page==='admin'){ backWrap.classList.add('show'); return renderAdminMenu(); }
+    if(state.page==='admin.content'){ backWrap.classList.add('show'); return renderContentSettings(); }
+    if(state.page==='admin.new'){ backWrap.classList.add('show'); return renderPostForm(); }
+    if(state.page==='admin.edit'){ backWrap.classList.add('show'); return renderPostList('edit'); }
+    if(state.page==='admin.delete'){ backWrap.classList.add('show'); return renderPostList('delete'); }
+  }
+
+  // Home: خوشامد + لینک‌ها + فیلترها + لیست
+  function renderHome(){
+    const brandOptions = Object.keys(BRANDS).map(b=>`<option value="${esc(b)}">${esc(b)}</option>`).join('');
+    view.innerHTML = `
+      <div class="grid-2">
+        <a class="square" href="https://instagram.com/truck.mirakhorli" target="_blank">
+          <div class="title">پیج اینستاگرام</div>
+          <div class="hint">@truck.mirakhorli</div>
+        </a>
+        <a class="square" href="tel:09121314226">
+          <div class="title">تماس با مشاور</div>
+          <div class="hint">09121314226</div>
+        </a>
+      </div>
+
+      <div class="card">
+        <div class="title" style="font-weight:700;margin-bottom:8px">جست‌وجو بر اساس فیلتر</div>
+        <label>برند</label>
+        <select id="f_brand"><option value="">همه برندها</option>${brandOptions}</select>
+        <label>سال ساخت</label>
+        <input id="f_year" type="number" placeholder="مثلاً 1398">
+
+        <label style="margin-top:10px">بازهٔ قیمت (تومان)</label>
+        <div class="row">
+          <input id="r_min" type="range" min="0" max="20000000000" step="100000000">
+          <input id="r_max" type="range" min="0" max="20000000000" step="100000000">
+        </div>
+        <div class="row">
+          <input id="f_min" type="number" placeholder="از" style="flex:1">
+          <input id="f_max" type="number" placeholder="تا" style="flex:1">
+        </div>
+        <div class="pill" id="priceLabel">۰ تا ۲۰,۰۰۰,000,000</div>
+
+        <div class="row" style="margin-top:10px">
+          <button class="btn" id="apply">اعمال</button>
+          <button class="btn btn-outline" id="reset">ریست</button>
+        </div>
+      </div>
+
+      <div class="card"><div id="posts"></div></div>
+    `;
+    // bind sliders
+    const rmin = $('#r_min'), rmax=$('#r_max'), nmin=$('#f_min'), nmax=$('#f_max'), lbl=$('#priceLabel');
+    const sync = ()=>{
+      let a = Number(rmin.value), b = Number(rmax.value);
+      if(a>b){ const t=a; a=b; b=t; }
+      nmin.value = a||0; nmax.value = b||0;
+      lbl.textContent = formatMoney(a)+' تا '+formatMoney(b);
+    };
+    const formatMoney = v => (v/1e9).toFixed(1).replace('.0','')+' میلیارد';
+    rmin.oninput = sync; rmax.oninput = sync; sync();
+    $('#apply').onclick = ()=> loadAndRenderPosts();
+    $('#reset').onclick = ()=>{ $('#f_brand').value=''; $('#f_year').value=''; rmin.value=0; rmax.value=20000000000; sync(); loadAndRenderPosts(); };
+    loadAndRenderPosts();
+  }
+
+  async function loadAndRenderPosts(){
+    const params = {};
+    if($('#f_brand')){ const b=$('#f_brand').value; if(b) params.brand=b; }
+    if($('#f_year')){ const y=$('#f_year').value; if(y) params.year=y; }
+    if($('#f_min')){ const mi=$('#f_min').value; if(mi) params.minp=mi; }
+    if($('#f_max')){ const ma=$('#f_max').value; if(ma) params.maxp=ma; }
+    const items = await getPosts(params);
+    const box = $('#posts'); box.innerHTML='';
+    items.forEach(p=>{
+      const el = document.createElement('div'); el.className='item';
+      el.innerHTML = `
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <div><b>${esc(p.brand||'')} ${esc(p.subbrand||'')}</b> <span class="pill">سال ${p.year||'—'}</span></div>
+          <div>${p.sold?'<span class="sold">✅ فروخته شده است</span>':''}</div>
+        </div>
+        <div class="pill">${priceTxt(p.price_toman)}</div>
+        <div class="gallery"></div>
+        ${p.description?`<div class="pill" style="margin-top:6px">${esc(p.description)}</div>`:''}
+        <div class="row" style="margin-top:8px">
+          ${p.insta_url?`<a class="btn" href="${esc(p.insta_url)}" target="_blank">مشاهده در اینستاگرام</a>`:''}
+          <a class="btn btn-outline" href="tel:09121314226">تماس با مشاور</a>
+        </div>
+      `;
+      const g = el.querySelector('.gallery');
+      (p.images||[]).forEach(u=>{ const im=new Image(); im.src=u; im.onclick=()=>openModal(u); g.appendChild(im); });
+      box.appendChild(el);
+    });
+  }
+
+  // Login page
+  function renderLogin(){
+    view.innerHTML = `
+      <div class="card">
+        <div class="square">
+          <div class="title">ورود مدیران</div>
+          <div class="hint">نام کاربری و رمز عبور را وارد کنید</div>
+          <label>نام کاربری</label><input id="lu" placeholder="username">
+          <label>رمز عبور</label><input id="lp" type="password" placeholder="password">
+          <div class="row" style="margin-top:10px">
+            <button class="btn" id="doLogin">ورود</button>
+            <button class="btn btn-outline" id="cancelLogin">انصراف</button>
+          </div>
+        </div>
+      </div>
+    `;
+    $('#doLogin').onclick = ()=> loginEditor($('#lu').value.trim(), $('#lp').value);
+    $('#cancelLogin').onclick = ()=> setPage('home');
+  }
+  $('#openLogin').onclick = ()=> setPage('login');
+
+  // Admin main menu
+  function renderAdminMenu(){
+    view.innerHTML = `
+      <a class="square" id="m_content"><div class="title">تنظیمات محتوا</div><div class="hint">منوها و بلوک‌ها (Drag & Drop)</div></a>
+      <a class="square" id="m_new"><div class="title">پست جدید</div><div class="hint">افزودن آگهی با آپلود تصاویر</div></a>
+      <a class="square" id="m_edit"><div class="title">ویرایش پست‌ها</div><div class="hint">لیست کامل برای ویرایش</div></a>
+      <a class="square" id="m_delete"><div class="title">حذف پست‌ها</div><div class="hint">فقط Owner می‌تواند حذف کند</div></a>
+    `;
+    $('#m_content').onclick = ()=> setPage('admin.content');
+    $('#m_new').onclick     = ()=> setPage('admin.new');
+    $('#m_edit').onclick    = ()=> setPage('admin.edit');
+    $('#m_delete').onclick  = ()=> setPage('admin.delete');
+  }
+
+  // Content settings (menu + blocks)
+  function renderContentSettings(){
+    const menuLis = (state.config.menu||[]).map((it,i)=>`
+      <li class="item" data-i="${i}">
+        <div class="row" style="align-items:center">
+          <span class="handle">☰</span>
+          <div style="flex:1"><b>${esc(it.title)}</b><div class="pill">${esc(it.path)}</div></div>
+          <button class="btn btn-outline" data-act="edit">ویرایش</button>
+          <button class="btn btn-outline" data-act="del">حذف</button>
+        </div>
+      </li>`).join('');
+    const blocks = (state.config.blocks||[]).map((b,i)=>`
+      <div class="item" data-i="${i}">
+        <div class="row" style="align-items:center">
+          <span class="handle">☰</span>
+          <div style="flex:1">${blockSummary(b)}</div>
+          <button class="btn btn-outline" data-edit="1">ویرایش</button>
+          <button class="btn btn-outline" data-del="1">حذف</button>
+        </div>
+      </div>`).join('');
+
+    view.innerHTML = `
+      <div class="card">
+        <label>متن خوش‌آمد</label>
+        <textarea id="welcomeInput" rows="2">${esc(state.config.welcome_text)}</textarea>
+      </div>
+
+      <div class="card">
+        <div class="title" style="font-weight:700;margin-bottom:6px">منو</div>
+        <ul id="menuBox">${menuLis||'<div class="pill">منویی تعریف نشده</div>'}</ul>
+        <div class="row">
+          <input id="newTitle" placeholder="عنوان">
+          <input id="newPath" placeholder="مسیر مثل / یا /about">
+          <button class="btn" id="addItem">افزودن آیتم</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="title" style="font-weight:700;margin-bottom:6px">بلوک‌ها</div>
+        <div id="blocksBox">${blocks||'<div class="pill">بلوکی تعریف نشده</div>'}</div>
+        <div class="row">
+          <select id="blockType"><option value="text">متن</option><option value="image">تصویر</option><option value="button">دکمه</option></select>
+          <button class="btn" id="addBlock">افزودن بلوک</button>
+        </div>
+      </div>
+
+      <div class="row" style="margin-top:8px">
+        <button class="btn" id="saveCfg">ذخیره تنظیمات</button>
+      </div>
+    `;
+
+    // Sortables
+    new Sortable($('#menuBox'),{handle:'.handle',animation:150,onEnd:()=>{
+      const items=[...$('#menuBox').querySelectorAll('li')];
+      state.config.menu = items.map(li=>{
+        const i = Number(li.dataset.i); return state.config.menu[i];
+      });
+      renderContentSettings();
+    }});
+    new Sortable($('#blocksBox'),{handle:'.handle',animation:150,onEnd:()=>{
+      const items=[...$('#blocksBox').children];
+      state.config.blocks = items.map(el=>{
+        const i = Number(el.dataset.i); return state.config.blocks[i];
+      });
+      renderContentSettings();
+    }});
+
+    // menu actions
+    $('#menuBox').onclick = e=>{
+      const li = e.target.closest('li'); if(!li) return;
+      const i = Number(li.dataset.i);
+      if(e.target.dataset.act==='del'){ state.config.menu.splice(i,1); renderContentSettings(); }
+      if(e.target.dataset.act==='edit'){
+        const t=prompt('عنوان', state.config.menu[i].title); if(t==null)return;
+        const p=prompt('مسیر', state.config.menu[i].path); if(p==null)return;
+        state.config.menu[i] = {title:t, path:p}; renderContentSettings();
+      }
+    };
+    $('#addItem').onclick = ()=>{ const t=$('#newTitle').value.trim(); const p=$('#newPath').value.trim(); if(!t)return; state.config.menu.push({title:t,path:p||'/'}); renderContentSettings(); };
+
+    // blocks actions
+    $('#blocksBox').onclick = e=>{
+      const el = e.target.closest('.item'); if(!el) return;
+      const i = Number(el.dataset.i);
+      if(e.target.hasAttribute('data-del')){ state.config.blocks.splice(i,1); renderContentSettings(); }
+      if(e.target.hasAttribute('data-edit')){ editBlock(state.config.blocks[i], nb=>{ state.config.blocks[i]=nb; renderContentSettings(); }); }
+    };
+    $('#addBlock').onclick = ()=>{
+      const t=$('#blockType').value;
+      const def = t==='text'?{type:'text',text:'متن نمونه'}: t==='image'?{type:'image',url:'https://placehold.co/800x400',alt:'',caption:''}:{type:'button',text:'بزن بریم',href:'/go'};
+      state.config.blocks.push(def); renderContentSettings();
+    };
+
+    $('#saveCfg').onclick = async ()=>{
+      const r = await fetch('/api/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ initData: tg?.initData||'', config: state.config })});
+      const j = await r.json();
+      alert(j.ok?'ذخیره شد ✅':('خطا: '+(j.error||'')));
+    };
+  }
+  function blockSummary(b){
+    if(b.type==='text') return `<b>متن:</b> <span class="pill">${esc((b.text||'').slice(0,80))}</span>`;
+    if(b.type==='image') return `<b>تصویر:</b> <span class="pill">${esc(b.url||'')}</span>`;
+    if(b.type==='button') return `<b>دکمه:</b> ${esc(b.text||'')} → <span class="pill">${esc(b.href||'')}</span>`;
+    return 'Unknown';
+  }
+  function editBlock(b,onSave){
+    if(b.type==='text'){ const t=prompt('متن:', b.text||''); if(t==null)return; onSave({type:'text',text:t}); }
+    if(b.type==='image'){ const u=prompt('URL تصویر:', b.url||''); if(u==null)return; const alt=prompt('ALT:', b.alt||''); if(alt==null)return; const cap=prompt('کپشن:', b.caption||''); if(cap==null)return; onSave({type:'image',url:u,alt,caption:cap}); }
+    if(b.type==='button'){ const t=prompt('متن دکمه:', b.text||''); if(t==null)return; const h=prompt('Href (مثلاً /go):', b.href||''); if(h==null)return; onSave({type:'button',text:t,href:h}); }
+  }
+
+  // New Post
+  function renderPostForm(){
+    view.innerHTML = `
+      <div class="card">
+        <div class="row">
+          <input id="p_id" type="hidden">
+          <input id="p_title" placeholder="عنوان">
+          <input id="p_brand" placeholder="برند (مثلاً Volvo)">
+          <input id="p_subbrand" placeholder="سری/مدل (مثلاً FH)">
+        </div>
+        <div class="row">
+          <input id="p_year" type="number" placeholder="سال">
+          <input id="p_price" type="number" placeholder="قیمت (تومان)">
+          <input id="p_mileage" type="number" placeholder="کارکرد (کیلومتر)">
+        </div>
+        <label>لینک پست اینستاگرام</label><input id="p_insta" placeholder="https://instagram.com/...">
+        <label>توضیحات</label><textarea id="p_desc" rows="3"></textarea>
+
+        <label>تصاویر (درگ‌اَند‌دراپ یا انتخاب)</label>
+        <input id="p_images" type="file" multiple accept="image/*">
+        <div id="p_gallery" class="gallery"></div>
+
+        <div class="row" style="margin-top:10px">
+          <button class="btn" id="savePost">ثبت/ذخیره</button>
+        </div>
+      </div>
+    `;
+    $('#p_images').onchange = async (e)=>{
+      const files = Array.from(e.target.files||[]);
+      for(const f of files){
+        const url = await uploadFileToSupabase(f);
+        if(url) state.uploads.push({url});
+      }
+      renderUploadPreview();
+    };
+    function renderUploadPreview(){
+      const g=$('#p_gallery'); g.innerHTML='';
+      state.uploads.forEach(u=>{ const im=new Image(); im.src=u.url; im.onclick=()=>openModal(u.url); g.appendChild(im); });
+    }
+    $('#savePost').onclick = async ()=>{
+      const payload = {
+        title: $('#p_title').value, brand: $('#p_brand').value, subbrand: $('#p_subbrand').value,
+        year: Number($('#p_year').value)||null, price_toman: Number($('#p_price').value)||0, mileage_km: Number($('#p_mileage').value)||null,
+        insta_url: $('#p_insta').value, description: $('#p_desc').value, images: state.uploads.map(u=>u.url)
+      };
+      const j = await savePost(payload);
+      alert(j.ok?'ذخیره شد ✅':('خطا: '+(j.error||'')));
+      if(j.ok){ state.uploads=[]; setPage('admin'); }
+    };
+  }
+
+  // Edit/Delete lists
+  async function renderPostList(mode){
+    const items = await getPosts({});
+    view.innerHTML = items.map(p=>`
+      <div class="item">
+        <div><b>${esc(p.brand||'')} ${esc(p.subbrand||'')}</b> <span class="pill">سال ${p.year||'—'}</span> – ${priceTxt(p.price_toman)}</div>
+        <div class="row" style="margin-top:6px">
+          ${mode==='edit' ? `<button class="btn btn-outline" data-edit="${p.id}">ویرایش</button>`:''}
+          ${mode==='delete' ? `<button class="btn" style="background:#ff4d4f" data-del="${p.id}">حذف</button>`:''}
+        </div>
+      </div>
+    `).join('') || '<div class="pill">موردی یافت نشد.</div>';
+
+    view.onclick = async (e)=>{
+      const id = e.target.dataset.edit || e.target.dataset.del;
+      if(!id) return;
+      if(e.target.dataset.edit){
+        // لود برای فرم «پست جدید»
+        const p = items.find(x=>x.id==id);
+        setPage('admin.new');
+        // کمی صبر تا صفحه رندر شود
+        setTimeout(()=>{
+          $('#p_title').value=p.title||''; $('#p_brand').value=p.brand||''; $('#p_subbrand').value=p.subbrand||'';
+          $('#p_year').value=p.year||''; $('#p_price').value=p.price_toman||''; $('#p_mileage').value=p.mileage_km||'';
+          $('#p_insta').value=p.insta_url||''; $('#p_desc').value=p.description||'';
+          state.uploads = (p.images||[]).map(u=>({url:u}));
+          // پیش‌نمایش
+          const g=$('#p_gallery'); g.innerHTML=''; state.uploads.forEach(u=>{ const im=new Image(); im.src=u.url; im.onclick=()=>openModal(u.url); g.appendChild(im); });
+          // ذخیره با id
+          $('#savePost').onclick = async ()=>{
+            const payload = {
+              id:p.id,
+              title: $('#p_title').value, brand: $('#p_brand').value, subbrand: $('#p_subbrand').value,
+              year: Number($('#p_year').value)||null, price_toman: Number($('#p_price').value)||0, mileage_km: Number($('#p_mileage').value)||null,
+              insta_url: $('#p_insta').value, description: $('#p_desc').value, images: state.uploads.map(u=>u.url)
+            };
+            const j = await savePost(payload);
+            alert(j.ok?'ذخیره شد ✅':('خطا: '+(j.error||'')));
+            if(j.ok){ setPage('admin'); }
+          };
+        },0);
+      }
+      if(e.target.dataset.del){
+        if(state.role!=='owner'){ alert('حذف فقط برای Owner مجاز است'); return; }
+        if(confirm('این پست حذف شود؟')){
+          const j = await deletePost(Number(id));
+          alert(j.ok?'حذف شد ✅':('خطا: '+(j.error||'')));
+          if(j.ok) renderPostList('delete');
+        }
+      }
+    };
+  }
+
+  // modal image
+  function openModal(url){ $('#modalImg').src=url; $('#imgModal').style.display='flex'; }
+  $('#modalClose').onclick = ()=> $('#imgModal').style.display='none';
 
   // برندها
   const BRANDS = {
@@ -217,244 +535,12 @@
     "Shacman":["X3000","X5000","M3000"]
   };
 
-  const state = {
-    role:'public', token:'', username:'',
-    config:{ welcome_text:'', menu:[], blocks:[] },
-    uploads:[]
-  };
-
-  function esc(s){ return String(s||'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m])) }
-  function formatPrice(x){ if(!x) return '—'; return (Number(x)/1e9).toFixed(2).replace(/\.00$/,'') + ' میلیارد'; }
-
-  async function getMe(){
-    const init = tg?.initData || '';
-    const q = new URLSearchParams({ initData:init, token:state.token }).toString();
-    const r = await fetch('/api/me?'+q);
-    const j = await r.json();
-    state.role = j.role || 'public';
-    state.username = j.username || '';
-    $('#adminPanel').classList.toggle('hidden', !j.is_admin);
-    $('#adminLoginStatus').textContent = j.is_admin ? `ورود: ${state.role}` : 'وارد نشده';
-    debug('me →', j);
-  }
-  async function loginEditor(){
-    const u = prompt('Username:'); if(u==null) return;
-    const p = prompt('Password:'); if(p==null) return;
-    const r = await fetch('/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:u,password:p})});
-    const j = await r.json();
-    if(j.ok){ state.token=j.token; state.role=j.role; state.username=u; $('#adminLoginStatus').textContent='ورود موفق'; await getMe(); }
-    else alert('خطای لاگین');
-  }
-  $('#adminLoginBtn').onclick = loginEditor;
-
-  async function loadConfig(){
-    const r = await fetch('/api/config'); const j = await r.json();
-    state.config = Object.assign({welcome_text:'',menu:[],blocks:[]}, j||{});
-    $('#welcome').textContent = state.config.welcome_text || '';
-    renderMenuEditor(); renderBlocksEditor();
-  }
-
-  function renderMenuEditor(){
-    const ul = $('#menuEditor'); ul.innerHTML='';
-    (state.config.menu||[]).forEach((it,idx)=>ul.appendChild(menuRow(it,idx)));
-    new Sortable(ul,{handle:'.handle',animation:150,onEnd:()=>{ const rows=[...ul.querySelectorAll('li')]; state.config.menu=rows.map(li=>({title:li.dataset.title,path:li.dataset.path})) }});
-  }
-  function menuRow(it,idx){
-    const li=document.createElement('li'); li.className='item'; li.dataset.title=it.title||''; li.dataset.path=it.path||'';
-    li.innerHTML=`<span class="handle">☰</span><div class="grow"><b>${esc(it.title)}</b><div class="pill">${esc(it.path)}</div></div><button data-act="edit">ویرایش</button><button data-act="del">حذف</button>`;
-    li.onclick=e=>{
-      const act=e.target?.dataset?.act;
-      if(act==='del'){ state.config.menu.splice(idx,1); renderMenuEditor(); }
-      if(act==='edit'){ const t=prompt('عنوان',li.dataset.title||''); if(t==null)return; const p=prompt('مسیر',li.dataset.path||''); if(p==null)return; state.config.menu[idx]={title:t,path:p}; renderMenuEditor(); }
-    };
-    return li;
-  }
-
-  function renderBlocksEditor(){
-    const box = $('#blocksEditor'); box.innerHTML='';
-    (state.config.blocks||[]).forEach((b,idx)=> box.appendChild(blockRow(b,idx)) );
-    new Sortable(box,{handle:'.handle',animation:150,onEnd:()=>{ const rows=[...box.children]; state.config.blocks=rows.map(el=>JSON.parse(el.dataset.block)) }});
-  }
-  function blockRow(b,idx){
-    const el=document.createElement('div'); el.className='item'; el.dataset.block=JSON.stringify(b);
-    el.innerHTML=`<span class="handle">☰</span><div class="grow">${blockSummary(b)}</div><button data-act="edit">ویرایش</button><button data-act="del">حذف</button>`;
-    el.onclick=e=>{
-      const act=e.target?.dataset?.act;
-      if(act==='del'){ state.config.blocks.splice(idx,1); renderBlocksEditor(); }
-      if(act==='edit'){ editBlock(b,(nb)=>{ state.config.blocks[idx]=nb; renderBlocksEditor(); }); }
-    };
-    return el;
-  }
-  function blockSummary(b){
-    if(b.type==='text')   return `<b>متن:</b> <span class="pill">${esc((b.text||'').slice(0,50))}</span>`;
-    if(b.type==='image')  return `<b>تصویر:</b> <span class="pill">${esc(b.url||'')}</span>`;
-    if(b.type==='button') return `<b>دکمه:</b> ${esc(b.text||'')} → <span class="pill">${esc(b.href||'')}</span>`;
-    return 'Unknown block';
-  }
-  function editBlock(b,onSave){
-    if(b.type==='text'){ const t=prompt('متن:',b.text||''); if(t==null)return; onSave({type:'text',text:t}); }
-    if(b.type==='image'){ const u=prompt('آدرس تصویر:',b.url||''); if(u==null)return; const alt=prompt('ALT:',b.alt||''); if(alt==null)return; const cap=prompt('کپشن:',b.caption||''); if(cap==null)return; onSave({type:'image',url:u,alt,caption:cap}); }
-    if(b.type==='button'){ const t=prompt('متن دکمه:',b.text||''); if(t==null)return; const h=prompt('Href (مثلاً /go):',b.href||''); if(h==null)return; onSave({type:'button',text:t,href:h}); }
-  }
-  $('#addItemBtn').onclick = ()=>{ const t=$('#newTitle').value.trim();const p=$('#newPath').value.trim(); if(!t)return; state.config.menu.push({title:t,path:p||'/'}); $('#newTitle').value='';$('#newPath').value=''; renderMenuEditor(); };
-  $('#addBlockBtn').onclick = ()=>{ const type=$('#blockType').value; const def= type==='text'?{type:'text',text:'متن نمونه'}: type==='image'?{type:'image',url:'https://placehold.co/800x400',alt:'',caption:''}:{type:'button',text:'بزن بریم',href:'/go'}; state.config.blocks.push(def); renderBlocksEditor(); };
-  $('#saveConfig').onclick = async ()=>{ const s=$('#saveConfigStatus'); s.textContent='در حال ذخیره…'; const r= await fetch('/api/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({initData: tg?.initData||'', config:{ welcome_text:$('#welcomeInput').value, menu:state.config.menu, blocks:state.config.blocks }})}); const j= await r.json(); s.textContent = j.ok?'ذخیره شد ✅':'خطا: '+(j.error||''); };
-
-  // فهرست و فیلتر پست‌ها
-  function fillBrandFilter(){ const sel = $('#f_brand'); sel.innerHTML='<option value="">همه برندها</option>'; Object.keys(BRANDS).forEach(b=>{ const o=document.createElement('option'); o.value=b;o.textContent=b; sel.appendChild(o); }); }
-  async function loadPosts(){
-    const p = new URLSearchParams();
-    const b=$('#f_brand').value; if(b) p.set('brand',b);
-    const y=$('#f_year').value; if(y) p.set('year',y);
-    const min=$('#f_min').value; if(min) p.set('minp',Math.floor(parseFloat(min||0)*1e9));
-    const max=$('#f_max').value; if(max) p.set('maxp',Math.floor(parseFloat(max||0)*1e9));
-    if($('#f_used').checked && !$('#f_zero').checked) p.set('used','true');
-    if($('#f_zero').checked && !$('#f_used').checked) p.set('used','false');
-    if($('#f_birang').checked) p.set('birang','true');
-    if($('#f_bedun').checked) p.set('bedun','true');
-    if($('#f_retarder').checked) p.set('retarder','true');
-    if($('#f_intarder').checked) p.set('intarder','true');
-    const r = await fetch('/api/posts?'+p.toString());
-    const j = await r.json(); renderPosts(j.items||[]);
-  }
-  function renderPosts(items){
-    const box = $('#posts'); box.innerHTML='';
-    items.forEach(p=>{
-      const card=document.createElement('div'); card.className='item';
-      const title= `${esc(p.brand||'')} ${esc(p.subbrand||'')} — ${esc(p.title||'')}`;
-      card.innerHTML = `
-        <div class="row" style="justify-content:space-between;align-items:center">
-          <div><b>${title}</b> <span class="pill">سال ${p.year||'—'}</span></div>
-          <div>${p.sold?'<span class="sold">✅ فروخته شده است</span>':''}</div>
-        </div>
-        <div class="pill">${formatPrice(p.price_toman)}</div>
-        <div class="gallery"></div>
-        <div class="pill">${esc(p.description||'')}</div>
-        <div class="row" style="margin-top:6px">
-          ${p.insta_url?`<a class="btn" href="${esc(p.insta_url)}" target="_blank" style="text-decoration:none">مشاهده در اینستاگرام</a>`:''}
-          <a class="btn" href="tel:09121314226" style="text-decoration:none">تماس با مشاور</a>
-        </div>
-        ${state.role!=='public'
-          ? `<div class="row" style="margin-top:6px">
-               <label><input type="checkbox" data-act="sold" ${p.sold?'checked':''}> فروخته شد</label>
-               <button data-act="edit">ویرایش</button>
-             </div>` : '' }
-      `;
-      const g = card.querySelector('.gallery');
-      (p.images||[]).forEach(url=>{ const img=document.createElement('img'); img.src=url; img.onclick=()=>openModal(url); g.appendChild(img); });
-      card.onclick = async (e)=>{
-        if(e.target?.dataset?.act==='sold'){
-          const sold = e.target.checked;
-          await fetch('/api/posts',{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({ id:p.id, sold, initData: tg?.initData||'', editorUser: state.role==='editor'?state.username:undefined })});
-          loadPosts();
-        }
-        if(e.target?.dataset?.act==='edit'){
-          $('#p_id').value=p.id; $('#p_title').value=p.title||''; $('#p_brand').value=p.brand||''; $('#p_subbrand').value=p.subbrand||'';
-          $('#p_year').value=p.year||''; $('#p_price').value=p.price_toman||''; $('#p_mileage').value=p.mileage_km||'';
-          $('#p_used').checked=!!p.used; $('#p_birang').checked=!!p.birang; $('#p_bedun').checked=!!p.bedun;
-          $('#p_retarder').checked=!!p.retarder; $('#p_intarder').checked=!!p.intarder; $('#p_sold').checked=!!p.sold;
-          $('#p_insta').value=p.insta_url||''; $('#p_desc').value=p.description||'';
-          state.uploads = (p.images||[]).map(u=>({file:null,url:u}));
-          renderUploadPreview();
-          window.scrollTo({top:document.body.scrollHeight, behavior:'smooth'});
-        }
-      };
-      box.appendChild(card);
-    });
-  }
-
-  // بزرگ‌نمایی
-  function openModal(url){ const m=$('#modal'); $('#modalImg').src=url; m.style.display='flex'; }
-
-  // ------------------ (ج) آپلود واقعی با Signed URL ------------------
-  $('#p_images').onchange = async (e)=>{
-    const files = Array.from(e.target.files || []);
-    for (const f of files) {
-      const url = await uploadFileToSupabase(f);
-      if (url) state.uploads.push({ file:null, url });
-    }
-    renderUploadPreview();
-  };
-
-  async function uploadFileToSupabase(file){
-    try{
-      // 1) از سرور URL امضاشده بگیر
-      const body = {
-        filename: file.name,
-        initData: tg?.initData || '',
-        editorUser: (state.role==='editor' ? state.username : undefined)
-      };
-      const r1 = await fetch('/api/upload-url', {
-        method:'POST', headers:{'Content-Type':'application/json'},
-        body: JSON.stringify(body)
-      });
-      const j1 = await r1.json();
-      if(!j1.ok) throw new Error(j1.error || 'upload_url_failed');
-
-      // 2) آپلود مستقیم به Supabase
-      const up = await SUPA.storage
-        .from(j1.bucket)
-        .uploadToSignedUrl(j1.path, j1.token, file, {
-          contentType: file.type || 'application/octet-stream',
-          upsert: false
-        });
-      if (up.error) throw new Error(up.error.message);
-
-      // 3) URL عمومی
-      return j1.publicUrl;
-    }catch(e){
-      alert('خطا در آپلود: ' + String(e));
-      return null;
-    }
-  }
-
-  function renderUploadPreview(){
-    const g=$('#p_gallery'); g.innerHTML='';
-    state.uploads.forEach((u)=>{ const img=document.createElement('img'); img.src=u.url; img.onclick=()=>openModal(u.url); g.appendChild(img); });
-  }
-
-  // ذخیره پست
-  $('#savePost').onclick = async ()=>{
-    const s=$('#savePostStatus'); s.textContent='در حال ذخیره…';
-    const payload = {
-      id: $('#p_id').value || undefined,
-      title: $('#p_title').value,
-      brand: $('#p_brand').value,
-      subbrand: $('#p_subbrand').value,
-      year: Number($('#p_year').value||0)||null,
-      price_toman: Number($('#p_price').value||0)||0,
-      mileage_km: Number($('#p_mileage').value||0)||null,
-      used: $('#p_used').checked,
-      birang: $('#p_birang').checked,
-      bedun_abrang: $('#p_bedun').checked,
-      retarder: $('#p_retarder').checked,
-      intarder: $('#p_intarder').checked,
-      sold: $('#p_sold').checked,
-      insta_url: $('#p_insta').value,
-      description: $('#p_desc').value,
-      images: state.uploads.map(u=>u.url)
-    };
-    const r = await fetch('/api/posts',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ initData: tg?.initData||'', payload, editorUser: state.role==='editor'?state.username:undefined })});
-    const j = await r.json();
-    s.textContent = j.ok ? 'ذخیره شد ✅' : ('خطا: '+(j.error||''));
-    if(j.ok){ $('#p_id').value=''; state.uploads=[]; renderUploadPreview(); loadPosts(); }
-  };
-
-  // فیلترها
-  function fillBrandFilter(){ const sel = $('#f_brand'); sel.innerHTML='<option value="">همه برندها</option>'; Object.keys(BRANDS).forEach(b=>{ const o=document.createElement('option'); o.value=b;o.textContent=b; sel.appendChild(o); }); }
-  $('#applyFilters').onclick = loadPosts;
-  $('#resetFilters').onclick = ()=>{ ['f_brand','f_year','f_min','f_max'].forEach(id=>$('#'+id).value=''); ['f_used','f_zero','f_birang','f_bedun','f_retarder','f_intarder'].forEach(id=>$('#'+id).checked=false); loadPosts(); };
-
-  // شروع
+  // boot
   (async ()=>{
-    try{
-      await initSupabaseClient();        // ← (ب) ساخت کلاینت فرانت
-      await getMe();
-      await loadConfig();
-      fillBrandFilter();
-      await loadPosts();
-      fetch('/api/track',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'visit',meta:{ts:Date.now()}})});
-    }catch(e){ debug('init error',String(e)); }
+    await initSupabase();
+    await getMe();
+    await loadConfig();
+    render();
   })();
 })();
 </script>
