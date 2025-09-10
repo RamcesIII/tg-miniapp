@@ -1,29 +1,33 @@
-// /api/me.js
 import { isValidInitData, getUserFromInitData } from './_verify.js';
+import { createClient } from '@supabase/supabase-js';
 
-export default async function handler(req, res) {
+const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE);
+
+export default async function handler(req, res){
   try {
-    const { initData = '' } = req.query;
-    const token = process.env.BOT_TOKEN;
+    const { initData = '', token = '' } = req.query;
 
-    if (!initData) return res.status(200).json({ is_admin:false, reason:'no_initdata' });
-    if (!token)     return res.status(500).json({ is_admin:false, reason:'no_bot_token' });
+    // 1) owner با تلگرام
+    if (isValidInitData(initData, process.env.BOT_TOKEN)) {
+      const u = getUserFromInitData(initData);
+      const isOwner = (process.env.ADMIN_IDS || '').split(',').map(s=>s.trim()).includes(String(u?.id));
+      if (isOwner) return res.status(200).json({ role: 'owner', is_admin: true, user_id: u?.id });
+    }
 
-    const ok = isValidInitData(initData, token);
-    if (!ok)       return res.status(200).json({ is_admin:false, reason:'invalid_signature' });
+    // 2) editor با توکن سشن (پس از login)
+    if (token) {
+      const { data, error } = await supabase
+        .from('admin_users')
+        .select('username,active,role')
+        .eq('pass_hash', token)   // سشن بسیار ساده: token را در pass_hash‌ای جدا ذخیره نکنیم؛ در عمل بهتر است جدول session جدا داشته باشیم. برای سادگی همین.
+        .maybeSingle();
+      if (!error && data && data.active) {
+        return res.status(200).json({ role: data.role || 'editor', is_admin: true, username: data.username });
+      }
+    }
 
-    const user = getUserFromInitData(initData);
-    const adminIds = (process.env.ADMIN_IDS || '')
-      .split(',').map(s=>s.trim()).filter(Boolean);
-
-    const isAdmin = user && adminIds.includes(String(user.id));
-    return res.status(200).json({
-      is_admin: !!isAdmin,
-      reason: isAdmin ? 'ok' : 'not_in_ADMIN_IDS',
-      user_id: user?.id ?? null,
-      admin_ids_count: adminIds.length
-    });
-  } catch (e) {
-    return res.status(500).json({ is_admin:false, reason:'server_error' });
+    return res.status(200).json({ role: 'public', is_admin: false });
+  } catch {
+    return res.status(500).json({ role: 'public', is_admin: false });
   }
 }
