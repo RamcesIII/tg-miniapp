@@ -7,6 +7,20 @@
   <!-- اسکریپت رسمی تلگرام برای WebApp -->
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <style>
+  <div id="debug" style="font:12px monospace;opacity:.8;margin-top:12px"></div>
+<script>
+(async ()=>{
+  const tg = window.Telegram?.WebApp; tg?.expand();
+  const init = tg?.initData || "";
+  let me;
+  try {
+    const r = await fetch('/api/me?initData=' + encodeURIComponent(init));
+    me = await r.json();
+  } catch(e) { me = { error: String(e) } }
+  document.getElementById('debug').textContent =
+    'initData.len=' + (init?.length||0) + ' | /api/me → ' + JSON.stringify(me);
+})();
+</script>
     body {
       font-family: sans-serif;
       margin: 0; padding: 24px;
