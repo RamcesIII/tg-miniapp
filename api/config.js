@@ -17,7 +17,7 @@ function isAdminByInitData(initData) {
   return u && adminIds.includes(String(u.id));
 }
 
-const DEFAULT_CFG = { welcome_text: 'سلام!', menu: [] };
+const DEFAULT_CFG = { welcome_text: 'سلام!', menu: [], blocks: [] };
 
 export default async function handler(req, res) {
   try {
@@ -28,43 +28,42 @@ export default async function handler(req, res) {
         .from('app_config')
         .select('*')
         .eq('id', 1)
-        .maybeSingle(); // اگر نبود، error نمی‌دهد
+        .maybeSingle();
 
-      if (error) {
-        // همیشه JSON برگردان
-        return res.status(500).json({ error: error.message, ok: false });
-      }
-      // اگر ردیف نبود، مقدار پیش‌فرض بده
+      if (error) return res.status(500).json({ ok:false, error: error.message });
+
       const row = data || DEFAULT_CFG;
       return res.status(200).json({
         welcome_text: row.welcome_text ?? DEFAULT_CFG.welcome_text,
         menu: row.menu ?? DEFAULT_CFG.menu,
+        blocks: row.blocks ?? DEFAULT_CFG.blocks
       });
     }
 
     if (req.method === 'POST') {
       const { initData = '', config } = req.body || {};
       if (!isAdminByInitData(initData)) {
-        return res.status(403).json({ ok: false, error: 'forbidden' });
+        return res.status(403).json({ ok:false, error:'forbidden' });
       }
-      const supabase = getClient();
-      // UPSERT: اگر ردیف id=1 نبود، بساز؛ اگر بود، آپدیت کن
+
+      const payload = {
+        id: 1,
+        welcome_text: String(config?.welcome_text || ''),
+        menu: config?.menu || [],
+        blocks: config?.blocks || []
+      };
+
       const { error } = await supabase
         .from('app_config')
-        .upsert({
-          id: 1,
-          welcome_text: String(config?.welcome_text || ''),
-          menu: config?.menu || [],
-        }, { onConflict: 'id' });
+        .upsert(payload, { onConflict: 'id' });
 
-      if (error) return res.status(500).json({ ok: false, error: error.message });
-      return res.status(200).json({ ok: true });
+      if (error) return res.status(500).json({ ok:false, error: error.message });
+      return res.status(200).json({ ok:true });
     }
 
     res.setHeader('Allow', 'GET, POST');
-    return res.status(405).json({ ok: false, error: 'method_not_allowed' });
+    return res.status(405).json({ ok:false, error:'method_not_allowed' });
   } catch (e) {
-    // هر خطای پیش‌بینی‌نشده → JSON
-    return res.status(500).json({ ok: false, error: String(e?.message || e) });
+    return res.status(500).json({ ok:false, error:String(e?.message||e) });
   }
 }
