@@ -3,402 +3,468 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Telegram Mini App</title>
+  <title>بازار ماشین‌های سنگین</title>
 
-  <!-- Telegram WebApp SDK -->
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
-  <!-- Drag & Drop (SortableJS) -->
   <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
-
   <style>
-    body{font-family:sans-serif;margin:0;padding:24px;background:var(--tg-theme-bg-color,#fff);color:var(--tg-theme-text-color,#111)}
-    .wrap{max-width:820px;margin:0 auto}
-    .card{background:var(--tg-theme-secondary-bg-color,#f5f5f5);border-radius:16px;padding:16px;box-shadow:0 2px 10px rgba(0,0,0,.06);margin:12px 0}
-    h1{margin:0 0 8px;font-size:20px}
-    h2{margin:8px 0;font-size:16px;opacity:.8}
+    body{font-family:sans-serif;margin:0;padding:16px;background:var(--tg-theme-bg-color,#fff);color:var(--tg-theme-text-color,#111)}
+    .wrap{max-width:980px;margin:0 auto}
+    .grid{display:grid;grid-template-columns:1fr;gap:12px}
+    @media(min-width:900px){ .grid{grid-template-columns: 300px 1fr} }
+    .card{background:var(--tg-theme-secondary-bg-color,#f5f5f5);border-radius:16px;padding:12px;box-shadow:0 2px 10px rgba(0,0,0,.06)}
+    h1{margin:0 0 8px}
+    h2{margin:8px 0;font-size:16px;opacity:.85}
+    label{display:block;margin-top:8px}
+    input,select,textarea{width:100%;padding:8px;border-radius:10px;border:1px solid #ddd;background:transparent;color:inherit}
     button{padding:10px 14px;border-radius:10px;border:0;cursor:pointer}
-    input,textarea,select{width:100%;padding:10px;border-radius:10px;border:1px solid #ddd;background:transparent;color:inherit}
-    .hidden{display:none}
-    ul{list-style:none;margin:0;padding:0}
-    .item{display:flex;align-items:center;gap:8px;padding:10px;border:1px solid #ddd;border-radius:12px;margin:8px 0;background:rgba(0,0,0,.02)}
-    .handle{cursor:grab;font-weight:bold;padding:0 8px}
-    .grow{flex:1}
-    .row{display:flex;gap:8px;flex-wrap:wrap}
-    .pill{font-size:12px;opacity:.7}
-    .block{border:1px dashed #ccc;border-radius:12px;padding:12px;margin:8px 0;background:rgba(0,0,0,.02)}
     .btn{background:var(--tg-theme-button-color,#2ea6ff);color:var(--tg-theme-button-text-color,#fff)}
-    #debug{font:12px/1.4 monospace;opacity:.85;white-space:pre-wrap;direction:ltr}
+    .pill{font-size:12px;opacity:.8}
+    .item{border:1px solid #ddd;border-radius:12px;padding:10px;margin:8px 0;background:rgba(0,0,0,.02)}
+    .row{display:flex;gap:8px;flex-wrap:wrap}
+    .hidden{display:none}
+    .gallery{display:flex;gap:6px;overflow:auto}
+    .gallery img{height:64px;border-radius:8px;cursor:zoom-in}
+    .modal{position:fixed;inset:0;background:rgba(0,0,0,.8);display:none;align-items:center;justify-content:center}
+    .modal img{max-width:95vw;max-height:90vh;border-radius:8px}
+    .handle{cursor:grab;font-weight:bold;padding:0 8px}
+    #debug{font:12px monospace;opacity:.8;white-space:pre-wrap;direction:ltr}
+    .sold{color:#0a7a12;font-weight:bold}
+    .filters .row>div{flex:1;min-width:120px}
   </style>
 </head>
 <body>
 <div class="wrap">
-  <!-- نمای کاربر -->
-  <div class="card">
-    <h1>مینی‌اپ نمونه</h1>
-    <div id="welcome">در حال بارگذاری…</div>
-  </div>
 
-  <div class="card">
-    <h1>منو</h1>
-    <ul id="menuView"></ul>
-  </div>
+  <div class="card"><h1>بازار کامیون و کشنده</h1><div id="welcome" class="pill"></div></div>
 
-  <div class="card">
-    <h1>محتوا</h1>
-    <div id="blocksView"></div>
-  </div>
+  <div class="grid">
+    <!-- فیلترها -->
+    <div class="card filters">
+      <h2>فیلترها</h2>
+      <div class="row">
+        <div>
+          <label>برند</label>
+          <select id="f_brand"></select>
+        </div>
+        <div>
+          <label>سال</label>
+          <input id="f_year" type="number" placeholder="مثلاً 1398">
+        </div>
+      </div>
+      <div class="row">
+        <div>
+          <label>قیمت از (میلیارد)</label>
+          <input id="f_min" type="number" min="0" max="20" step="0.1" placeholder="0">
+        </div>
+        <div>
+          <label>تا (میلیارد)</label>
+          <input id="f_max" type="number" min="0" max="20" step="0.1" placeholder="20">
+        </div>
+      </div>
+      <div class="row">
+        <label><input type="checkbox" id="f_used"> کارکرده</label>
+        <label><input type="checkbox" id="f_zero"> صفر</label>
+      </div>
+      <div class="row">
+        <label><input type="checkbox" id="f_birang"> بی‌رنگ</label>
+        <label><input type="checkbox" id="f_bedun"> بدون آبرنگ</label>
+      </div>
+      <div class="row">
+        <label><input type="checkbox" id="f_retarder"> ریتارد</label>
+        <label><input type="checkbox" id="f_intarder"> اینتارد</label>
+      </div>
+      <div class="row" style="margin-top:8px">
+        <button class="btn" id="applyFilters">اعمال</button>
+        <button id="resetFilters">ریست</button>
+      </div>
 
-  <!-- پنل ادمین با Drag & Drop -->
-  <div id="adminPanel" class="card hidden">
-    <h1>پنل ادمین 👑</h1>
-
-    <label>متن خوش‌آمد</label>
-    <textarea id="welcomeInput" rows="3"></textarea>
-
-    <div class="row" style="margin-top:12px">
-      <div class="grow">
-        <h2 class="pill">منوی کاربر (Drag & Drop)</h2>
-        <ul id="menuEditor"></ul>
+      <h2 style="margin-top:16px">لینک‌ها</h2>
+      <div class="row">
+        <a class="btn" href="https://instagram.com/truck.mirakhorli" target="_blank" style="text-decoration:none;text-align:center;flex:1">پیج اینستاگرام</a>
+        <a class="btn" href="tel:09121314226" style="text-decoration:none;text-align:center;flex:1">تماس با مشاور</a>
       </div>
     </div>
 
+    <!-- لیست پست‌ها -->
+    <div class="card">
+      <div id="posts"></div>
+    </div>
+  </div>
+
+  <!-- محتوای مدیریت (منو/بلوک‌ها + CRUD پست‌ها) -->
+  <div id="adminPanel" class="card hidden">
+    <h2>پنل ادمین 👑</h2>
+
     <div class="row">
-      <input id="newTitle" placeholder="عنوان منو (مثلاً: خانه)"/>
-      <input id="newPath" placeholder="مسیر (مثلاً: / یا /about)"/>
+      <button id="adminLoginBtn">ورود ادمین (username/password)</button>
+      <span id="adminLoginStatus" class="pill"></span>
+    </div>
+
+    <h3>تنظیمات محتوا</h3>
+    <label>متن خوش‌آمد</label>
+    <textarea id="welcomeInput" rows="2"></textarea>
+
+    <h4 class="pill">منو (Drag & Drop)</h4>
+    <ul id="menuEditor"></ul>
+    <div class="row">
+      <input id="newTitle" placeholder="عنوان منو"/>
+      <input id="newPath" placeholder="مسیر مثل / یا /about"/>
       <button id="addItemBtn">افزودن آیتم</button>
     </div>
 
-    <div style="margin:12px 0"></div>
-    <h2 class="pill">بلوک‌های محتوا (Drag & Drop)</h2>
+    <h4 class="pill" style="margin-top:12px">بلوک‌ها (Drag & Drop)</h4>
     <div id="blocksEditor"></div>
-
-    <div class="row" style="margin-top:8px">
+    <div class="row">
       <select id="blockType">
-        <option value="text">متن</option>
-        <option value="image">تصویر</option>
-        <option value="button">دکمه</option>
+        <option value="text">متن</option><option value="image">تصویر</option><option value="button">دکمه</option>
       </select>
       <button id="addBlockBtn">افزودن بلوک</button>
     </div>
 
-    <div class="row" style="margin-top:12px">
-      <button id="saveBtn" class="btn">ذخیره</button>
-      <span id="saveStatus"></span>
+    <div class="row" style="margin-top:8px">
+      <button class="btn" id="saveConfig">ذخیره تنظیمات</button>
+      <span id="saveConfigStatus" class="pill"></span>
     </div>
+
+    <hr/>
+
+    <h3>پست جدید / ویرایش</h3>
+    <div class="row">
+      <input id="p_id" type="hidden">
+      <input id="p_title" placeholder="عنوان">
+      <input id="p_brand" placeholder="برند (مثلاً Volvo)">
+      <input id="p_subbrand" placeholder="سری/مدل (مثلاً FH)">
+    </div>
+    <div class="row">
+      <input id="p_year" type="number" placeholder="سال">
+      <input id="p_price" type="number" placeholder="قیمت (تومان)">
+      <input id="p_mileage" type="number" placeholder="کارکرد (کیلومتر)">
+    </div>
+    <div class="row">
+      <label><input type="checkbox" id="p_used" checked> کارکرده</label>
+      <label><input type="checkbox" id="p_birang"> بی‌رنگ</label>
+      <label><input type="checkbox" id="p_bedun"> بدون آبرنگ</label>
+      <label><input type="checkbox" id="p_retarder"> ریتارد</label>
+      <label><input type="checkbox" id="p_intarder"> اینتارد</label>
+      <label><input type="checkbox" id="p_sold"> فروخته‌شده</label>
+    </div>
+    <label>لینک پست اینستاگرام</label>
+    <input id="p_insta" placeholder="https://instagram.com/....">
+    <label>توضیحات</label>
+    <textarea id="p_desc" rows="3"></textarea>
+
+    <label>تصاویر (درگ‌اَند‌دراپ یا انتخاب فایل)</label>
+    <input id="p_images" type="file" multiple accept="image/*">
+    <div id="p_gallery" class="gallery"></div>
+
+    <div class="row" style="margin-top:8px">
+      <button class="btn" id="savePost">ثبت/ذخیره</button>
+      <span id="savePostStatus" class="pill"></span>
+    </div>
+
+    <h3>رمزساز (فقط Owner)</h3>
+    <div class="row">
+      <button id="genPwd" class="btn">ساخت یوزرنیم/پسورد ادمین ویرایشگر</button>
+      <input id="rvkUser" placeholder="username برای revoke">
+      <button id="revokeBtn">Revoke</button>
+      <span id="genStatus" class="pill"></span>
+    </div>
+
+    <h3>نمودار رویدادها (بازدید/کلیک)</h3>
+    <div id="stats" class="pill">به‌زودی (Data در audit_logs ذخیره می‌شود)</div>
   </div>
 
-  <!-- بخش دیباگ -->
-  <div class="card">
-    <h1>Debug</h1>
-    <div id="debug">starting…</div>
-  </div>
+  <div id="debug" class="card">starting…</div>
+</div>
+
+<!-- مدال بزرگ‌نمایی -->
+<div id="modal" class="modal" onclick="this.style.display='none'">
+  <img id="modalImg" src="">
 </div>
 
 <script>
 (function(){
   const tg = window.Telegram?.WebApp; tg?.expand();
 
-  const debug = (...args)=> {
-    const el = document.getElementById('debug');
-    el.textContent += '\n' + args.map(x => {
-      try { return typeof x === 'string' ? x : JSON.stringify(x); }
-      catch { return String(x); }
-    }).join(' ');
+  const debug = (...a)=>{ const el=document.getElementById('debug'); el.textContent += '\n'+a.map(x=>{try{return typeof x==='string'?x:JSON.stringify(x)}catch{return String(x)}}).join(' '); };
+
+  // برندها + زیرمنوهای پیشنهادی (می‌تونی بعداً از config بگیری)
+  const BRANDS = {
+    "Volvo": ["FH","FM","FMX","F12","F16"],
+    "Scania": ["R","S","P","G","T"],
+    "Mercedes-Benz": ["Actros","Axor","Atego"],
+    "MAN": ["TGX","TGS","TGA","F2000"],
+    "DAF": ["XF","CF","LF"],
+    "Iveco": ["Stralis","Trakker","Eurocargo"],
+    "Renault": ["T","C","K","Magnum","Premium"],
+    "Kamaz": ["5490","6520","6460"],
+    "Howo": ["A7","T7H","T5G"],
+    "FAW": ["JH6","J5P"],
+    "Dongfeng": ["KX","KL","KC"],
+    "Shacman": ["X3000","X5000","M3000"]
   };
 
+  // ----- وضعیت سراسری -----
   const state = {
-    isAdmin:false,
-    config:{ welcome_text:'', menu:[], blocks:[] }
+    role:'public', token:'', username:'',
+    config:{ welcome_text:'', menu:[], blocks:[] },
+    filters:{},
+    uploads:[], // {file, url}
   };
 
-  // ---------- UI رندر کاربر ----------
-  function renderUserView(){
-    // Welcome
-    document.getElementById('welcome').textContent =
-      state.config.welcome_text || 'سلام!';
+  // UI helpers
+  const $ = s => document.querySelector(s);
 
-    // Menu
-    const ul = document.getElementById('menuView');
-    ul.innerHTML = '';
-    (state.config.menu || []).forEach(item=>{
-      const li = document.createElement('li');
-      li.className = 'item';
-      li.innerHTML = `
-        <div class="grow"><b>${escapeHtml(item.title||'')}</b>
-          <span class="pill">${escapeHtml(item.path||'')}</span>
-        </div>`;
-      ul.appendChild(li);
-    });
+  function formatPrice(x){ if(!x) return '—'; return (Number(x)/1e9).toFixed(2).replace(/\.00$/,'') + ' میلیارد'; }
 
-    // Blocks
-    const bv = document.getElementById('blocksView');
-    bv.innerHTML = '';
-    (state.config.blocks || []).forEach(block=>{
-      bv.appendChild(renderBlockView(block));
-    });
+  // ----------------- احراز هویت / منو / بلوک‌ها -----------------
+  async function getMe(){
+    const init = tg?.initData || '';
+    const q = new URLSearchParams({ initData: init, token: state.token }).toString();
+    const r = await fetch('/api/me?'+q);
+    const j = await r.json();
+    state.role = j.role || 'public';
+    state.username = j.username || '';
+    $('#adminPanel').classList.toggle('hidden', !j.is_admin);
+    $('#adminLoginStatus').textContent = j.is_admin ? `ورود: ${state.role}` : 'وارد نشده';
+    debug('me →', j);
   }
 
-  function renderBlockView(block){
-    const wrap = document.createElement('div');
-    wrap.className = 'block';
-    if(block.type === 'text'){
-      wrap.textContent = block.text || '';
-    } else if(block.type === 'image'){
-      const img = document.createElement('img');
-      img.src = block.url || '';
-      img.alt = block.alt || '';
-      img.style.maxWidth = '100%';
-      img.style.borderRadius = '12px';
-      wrap.appendChild(img);
-      if(block.caption){
-        const cap = document.createElement('div');
-        cap.className = 'pill';
-        cap.textContent = block.caption;
-        wrap.appendChild(cap);
-      }
-    } else if(block.type === 'button'){
-      const btn = document.createElement('button');
-      btn.className = 'btn';
-      btn.textContent = block.text || 'دکمه';
-      btn.onclick = () => {
-        if(block.href) location.hash = block.href;
-      };
-      wrap.appendChild(btn);
-    } else {
-      wrap.textContent = 'Unsupported block';
-    }
-    return wrap;
+  async function loginEditor(){
+    const u = prompt('Username:'); if(u==null) return;
+    const p = prompt('Password:'); if(p==null) return;
+    const r = await fetch('/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:u,password:p})});
+    const j = await r.json();
+    if(j.ok){ state.token=j.token; state.role=j.role; state.username=u; $('#adminLoginStatus').textContent='ورود موفق'; await getMe(); }
+    else alert('خطای لاگین');
   }
 
-  // ---------- UI پنل ادمین ----------
-  function renderAdmin(){
-    const admin = document.getElementById('adminPanel');
-    if(!state.isAdmin){ admin.classList.add('hidden'); return; }
-    admin.classList.remove('hidden');
+  $('#adminLoginBtn').onclick = loginEditor;
 
-    document.getElementById('welcomeInput').value = state.config.welcome_text || '';
-
-    // منو
-    const ul = document.getElementById('menuEditor');
-    ul.innerHTML = '';
-    (state.config.menu || []).forEach((item, idx)=>{
-      ul.appendChild(menuItemRow(item, idx));
-    });
-    new Sortable(ul, {
-      handle: '.handle',
-      animation: 150,
-      onEnd: () => {
-        const rows = [...ul.querySelectorAll('li')];
-        state.config.menu = rows.map(li => ({
-          title: li.dataset.title,
-          path: li.dataset.path
-        }));
-        renderUserView();
-      }
-    });
-
-    // بلوک‌ها
-    const be = document.getElementById('blocksEditor');
-    be.innerHTML = '';
-    (state.config.blocks || []).forEach((b, idx)=>{
-      be.appendChild(blockEditorRow(b, idx));
-    });
-    new Sortable(be, {
-      handle: '.handle',
-      animation: 150,
-      onEnd: () => {
-        const rows = [...be.children];
-        state.config.blocks = rows.map(el => JSON.parse(el.dataset.block));
-        renderUserView();
-      }
-    });
+  async function loadConfig(){
+    const r = await fetch('/api/config'); const j = await r.json();
+    state.config = Object.assign({welcome_text:'',menu:[],blocks:[]}, j||{});
+    $('#welcome').textContent = state.config.welcome_text || '';
+    // منو و بلوک‌ها در Admin:
+    renderMenuEditor(); renderBlocksEditor();
   }
 
-  function menuItemRow(item, idx){
-    const li = document.createElement('li');
-    li.className = 'item';
-    li.dataset.title = item.title || '';
-    li.dataset.path  = item.path || '';
-    li.innerHTML = `
-      <span class="handle">☰</span>
-      <div class="grow">
-        <div><b>${escapeHtml(item.title||'')}</b></div>
-        <div class="pill">${escapeHtml(item.path||'')}</div>
-      </div>
-      <button data-act="edit">ویرایش</button>
-      <button data-act="del">حذف</button>
-    `;
-    li.onclick = (e)=>{
-      const act = e.target?.dataset?.act;
-      if(act==='del'){
-        state.config.menu.splice(idx,1);
-        renderAdmin(); renderUserView();
-      }
-      if(act==='edit'){
-        const t = prompt('عنوان جدید:', li.dataset.title || '');
-        if(t===null) return;
-        const p = prompt('مسیر جدید:', li.dataset.path || '');
-        if(p===null) return;
-        state.config.menu[idx] = { title:t, path:p };
-        renderAdmin(); renderUserView();
-      }
+  function renderMenuEditor(){
+    const ul = $('#menuEditor'); ul.innerHTML='';
+    (state.config.menu||[]).forEach((it,idx)=>ul.appendChild(menuRow(it,idx)));
+    new Sortable(ul,{handle:'.handle',animation:150,onEnd:()=>{ const rows=[...ul.querySelectorAll('li')]; state.config.menu=rows.map(li=>({title:li.dataset.title,path:li.dataset.path})) }});
+  }
+
+  function menuRow(it,idx){
+    const li=document.createElement('li'); li.className='item'; li.dataset.title=it.title||''; li.dataset.path=it.path||'';
+    li.innerHTML=`<span class="handle">☰</span><div class="grow"><b>${esc(it.title)}</b><div class="pill">${esc(it.path)}</div></div><button data-act="edit">ویرایش</button><button data-act="del">حذف</button>`;
+    li.onclick=e=>{
+      const act=e.target?.dataset?.act;
+      if(act==='del'){ state.config.menu.splice(idx,1); renderMenuEditor(); }
+      if(act==='edit'){ const t=prompt('عنوان',li.dataset.title||''); if(t==null)return; const p=prompt('مسیر',li.dataset.path||''); if(p==null)return; state.config.menu[idx]={title:t,path:p}; renderMenuEditor(); }
     };
     return li;
   }
 
-  function blockEditorRow(block, idx){
-    const row = document.createElement('div');
-    row.className = 'item';
-    row.dataset.block = JSON.stringify(block);
+  function renderBlocksEditor(){
+    const box = $('#blocksEditor'); box.innerHTML='';
+    (state.config.blocks||[]).forEach((b,idx)=> box.appendChild(blockRow(b,idx)) );
+    new Sortable(box,{handle:'.handle',animation:150,onEnd:()=>{ const rows=[...box.children]; state.config.blocks=rows.map(el=>JSON.parse(el.dataset.block)) }});
+  }
 
-    row.innerHTML = `
-      <span class="handle">☰</span>
-      <div class="grow"></div>
-      <button data-act="edit">ویرایش</button>
-      <button data-act="del">حذف</button>
-    `;
-
-    const body = row.querySelector('.grow');
-    body.appendChild(renderBlockSummary(block));
-
-    row.onclick = (e)=>{
-      const act = e.target?.dataset?.act;
-      if(act==='del'){
-        state.config.blocks.splice(idx,1);
-        renderAdmin(); renderUserView();
-      }
-      if(act==='edit'){
-        editBlock(block, (updated)=>{
-          state.config.blocks[idx] = updated;
-          renderAdmin(); renderUserView();
-        });
-      }
+  function blockRow(b,idx){
+    const el=document.createElement('div'); el.className='item'; el.dataset.block=JSON.stringify(b);
+    el.innerHTML=`<span class="handle">☰</span><div class="grow">${blockSummary(b)}</div><button data-act="edit">ویرایش</button><button data-act="del">حذف</button>`;
+    el.onclick=e=>{
+      const act=e.target?.dataset?.act;
+      if(act==='del'){ state.config.blocks.splice(idx,1); renderBlocksEditor(); }
+      if(act==='edit'){ editBlock(b,(nb)=>{ state.config.blocks[idx]=nb; renderBlocksEditor(); }); }
     };
-    return row;
+    return el;
   }
 
-  function renderBlockSummary(b){
-    const s = document.createElement('div');
-    s.innerHTML = `
-      <div><b>نوع:</b> ${escapeHtml(b.type||'')}</div>
-      ${b.type==='text' ? `<div class="pill">${escapeHtml((b.text||'').slice(0,60))}</div>`:''}
-      ${b.type==='image' ? `<div class="pill">${escapeHtml(b.url||'')}</div>`:''}
-      ${b.type==='button'? `<div class="pill">${escapeHtml(b.text||'')} → ${escapeHtml(b.href||'')}</div>`:''}
-    `;
-    return s;
+  function blockSummary(b){
+    if(b.type==='text')   return `<b>متن:</b> <span class="pill">${esc((b.text||'').slice(0,50))}</span>`;
+    if(b.type==='image')  return `<b>تصویر:</b> <span class="pill">${esc(b.url||'')}</span>`;
+    if(b.type==='button') return `<b>دکمه:</b> ${esc(b.text||'')} → <span class="pill">${esc(b.href||'')}</span>`;
+    return 'Unknown block';
   }
 
-  function editBlock(block, onSave){
-    if(block.type==='text'){
-      const t = prompt('متن:', block.text || '');
-      if(t===null) return;
-      onSave({ type:'text', text:t });
-    } else if(block.type==='image'){
-      const url = prompt('آدرس تصویر:', block.url || '');
-      if(url===null) return;
-      const alt = prompt('ALT (اختیاری):', block.alt || '');
-      if(alt===null) return;
-      const cap = prompt('کپشن (اختیاری):', block.caption || '');
-      if(cap===null) return;
-      onSave({ type:'image', url, alt, caption: cap });
-    } else if(block.type==='button'){
-      const text = prompt('متن دکمه:', block.text || '');
-      if(text===null) return;
-      const href = prompt('مسیر/لینک (مثلاً /go ):', block.href || '');
-      if(href===null) return;
-      onSave({ type:'button', text, href });
-    }
+  function editBlock(b,onSave){
+    if(b.type==='text'){ const t=prompt('متن:',b.text||''); if(t==null)return; onSave({type:'text',text:t}); }
+    if(b.type==='image'){ const u=prompt('آدرس تصویر:',b.url||''); if(u==null)return; const alt=prompt('ALT:',b.alt||''); if(alt==null)return; const cap=prompt('کپشن:',b.caption||''); if(cap==null)return; onSave({type:'image',url:u,alt,caption:cap}); }
+    if(b.type==='button'){ const t=prompt('متن دکمه:',b.text||''); if(t==null)return; const h=prompt('Href (مثلاً /go):',b.href||''); if(h==null)return; onSave({type:'button',text:t,href:h}); }
   }
 
-  function escapeHtml(s){
-    return String(s||'').replace(/[&<>"']/g, m=>({
-      '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
-    }[m]));
+  $('#addItemBtn').onclick = ()=>{ const t=$('#newTitle').value.trim();const p=$('#newPath').value.trim(); if(!t)return; state.config.menu.push({title:t,path:p||'/'}); $('#newTitle').value='';$('#newPath').value=''; renderMenuEditor(); };
+  $('#addBlockBtn').onclick = ()=>{ const type=$('#blockType').value; const def= type==='text'?{type:'text',text:'متن نمونه'}: type==='image'?{type:'image',url:'https://placehold.co/800x400',alt:'',caption:''}:{type:'button',text:'بزن بریم',href:'/go'}; state.config.blocks.push(def); renderBlocksEditor(); };
+
+  $('#saveConfig').onclick = async ()=>{
+    const status=$('#saveConfigStatus'); status.textContent='در حال ذخیره…';
+    const r= await fetch('/api/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({initData: tg?.initData||'', config:{ welcome_text:$('#welcomeInput').value, menu:state.config.menu, blocks:state.config.blocks }})});
+    const j= await r.json(); status.textContent = j.ok?'ذخیره شد ✅':'خطا: '+(j.error||'');
+  };
+
+  // ---------------------- فیلترها و لیست پست‌ها ----------------------
+  function fillBrandFilter(){
+    const sel = $('#f_brand'); sel.innerHTML='<option value="">همه برندها</option>';
+    Object.keys(BRANDS).forEach(b=>{ const o=document.createElement('option'); o.value=b;o.textContent=b; sel.appendChild(o); });
   }
 
-  // ---------- API ----------
-  async function getMe(){
-    const init = tg?.initData || '';
-    const r = await fetch('/api/me?initData=' + encodeURIComponent(init));
+  async function loadPosts(){
+    const params = new URLSearchParams();
+    const b=$('#f_brand').value; if(b) params.set('brand',b);
+    const y=$('#f_year').value; if(y) params.set('year',y);
+    const min=$('#f_min').value; if(min) params.set('minp',Math.floor(parseFloat(min||0)*1e9));
+    const max=$('#f_max').value; if(max) params.set('maxp',Math.floor(parseFloat(max||0)*1e9));
+    if($('#f_used').checked && !$('#f_zero').checked) params.set('used','true');
+    if($('#f_zero').checked && !$('#f_used').checked) params.set('used','false');
+    if($('#f_birang').checked) params.set('birang','true');
+    if($('#f_bedun').checked) params.set('bedun','true');
+    if($('#f_retarder').checked) params.set('retarder','true');
+    if($('#f_intarder').checked) params.set('intarder','true');
+
+    const r = await fetch('/api/posts?'+params.toString());
     const j = await r.json();
-    debug('initData.len=', (init||'').length, '| /api/me →', j);
-    return j;
+    renderPosts(j.items||[]);
   }
-  async function getConfig(){
-    const r = await fetch('/api/config');
-    const txt = await r.text();
-    try { const j = JSON.parse(txt); debug('/api/config GET →', j); return j; }
-    catch { debug('/api/config RAW →', txt.slice(0,250)); throw new Error('config_not_json'); }
-  }
-  async function saveConfig(cfg){
-    const r = await fetch('/api/config', {
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ initData: tg?.initData || '', config: cfg })
+
+  function renderPosts(items){
+    const box = $('#posts'); box.innerHTML='';
+    items.forEach(p=>{
+      const card=document.createElement('div'); card.className='item';
+      const title= `${esc(p.brand||'')} ${esc(p.subbrand||'')} — ${esc(p.title||'')}`;
+      card.innerHTML = `
+        <div class="row" style="justify-content:space-between;align-items:center">
+          <div><b>${title}</b> <span class="pill">سال ${p.year||'—'}</span></div>
+          <div>${p.sold?'<span class="sold">✅ فروخته شده است</span>':''}</div>
+        </div>
+        <div class="pill">${formatPrice(p.price_toman)}</div>
+        <div class="gallery"></div>
+        <div class="pill">${esc(p.description||'')}</div>
+        <div class="row" style="margin-top:6px">
+          ${p.insta_url?`<a class="btn" href="${esc(p.insta_url)}" target="_blank" style="text-decoration:none">مشاهده در اینستاگرام</a>`:''}
+          <a class="btn" href="tel:09121314226" style="text-decoration:none">تماس با مشاور</a>
+        </div>
+        ${state.role!=='public'
+          ? `<div class="row" style="margin-top:6px">
+               <label><input type="checkbox" data-act="sold" ${p.sold?'checked':''}> فروخته شد</label>
+               <button data-act="edit">ویرایش</button>
+             </div>` : '' }
+      `;
+
+      // گالری
+      const g = card.querySelector('.gallery');
+      (p.images||[]).forEach(url=>{
+        const img=document.createElement('img');
+        img.src=url; img.onclick=()=>openModal(url); g.appendChild(img);
+      });
+
+      // تعاملات
+      card.onclick = async (e)=>{
+        if(e.target?.dataset?.act==='sold'){
+          const sold = e.target.checked;
+          await fetch('/api/posts',{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({ id:p.id, sold, initData: tg?.initData||'', editorUser: state.role==='editor'?state.username:undefined })});
+          loadPosts();
+        }
+        if(e.target?.dataset?.act==='edit'){
+          // بارگذاری در فرم ادمین برای ویرایش
+          $('#p_id').value=p.id; $('#p_title').value=p.title||''; $('#p_brand').value=p.brand||''; $('#p_subbrand').value=p.subbrand||'';
+          $('#p_year').value=p.year||''; $('#p_price').value=p.price_toman||''; $('#p_mileage').value=p.mileage_km||'';
+          $('#p_used').checked=!!p.used; $('#p_birang').checked=!!p.birang; $('#p_bedun').checked=!!p.bedun;
+          $('#p_retarder').checked=!!p.retarder; $('#p_intarder').checked=!!p.intarder; $('#p_sold').checked=!!p.sold;
+          $('#p_insta').value=p.insta_url||''; $('#p_desc').value=p.description||'';
+          state.uploads = (p.images||[]).map(u=>({file:null,url:u}));
+          renderUploadPreview();
+          window.scrollTo({top:document.body.scrollHeight, behavior:'smooth'});
+        }
+      };
+
+      box.appendChild(card);
     });
-    const j = await r.json().catch(()=>({ok:false,error:'not_json'}));
-    debug('/api/config POST →', j);
-    return j;
   }
 
-  // افزودن آیتم/بلوک
-  document.getElementById('addItemBtn').onclick = ()=>{
-    const t = document.getElementById('newTitle').value.trim();
-    const p = document.getElementById('newPath').value.trim();
-    if(!t) return alert('عنوان را وارد کنید');
-    state.config.menu = state.config.menu || [];
-    state.config.menu.push({ title:t, path:p||'/' });
-    document.getElementById('newTitle').value='';
-    document.getElementById('newPath').value='';
-    renderAdmin(); renderUserView();
+  // -------------------- آپلود تصاویر (پیش‌نمایش + مدال) --------------------
+  function openModal(url){ const m=$('#modal'); $('#modalImg').src=url; m.style.display='flex'; }
+
+  $('#p_images').onchange = async (e)=>{
+    const files = Array.from(e.target.files||[]);
+    for(const f of files){
+      // اینجا برای سادگی از URL موقت مرورگر استفاده می‌کنیم؛
+      // در عمل می‌تونی به /api/upload-url بفرستی و روی برگشتی ذخیره کنی.
+      const url=URL.createObjectURL(f);
+      state.uploads.push({file:f,url});
+    }
+    renderUploadPreview();
   };
 
-  document.getElementById('addBlockBtn').onclick = ()=>{
-    const type = document.getElementById('blockType').value;
-    const def = type==='text'   ? {type:'text', text:'متن نمونه'} :
-                type==='image'  ? {type:'image', url:'https://placehold.co/600x300', alt:'', caption:''} :
-                                   {type:'button', text:'بزن بریم', href:'/go'};
-    state.config.blocks = state.config.blocks || [];
-    state.config.blocks.push(def);
-    renderAdmin(); renderUserView();
-  };
+  function renderUploadPreview(){
+    const g=$('#p_gallery'); g.innerHTML='';
+    state.uploads.forEach((u,i)=>{
+      const img=document.createElement('img'); img.src=u.url; img.onclick=()=>openModal(u.url); g.appendChild(img);
+    });
+  }
 
-  // ذخیره
-  document.getElementById('saveBtn').onclick = async ()=>{
-    const status = document.getElementById('saveStatus');
-    status.textContent = 'در حال ذخیره…';
-    const cfg = {
-      welcome_text: document.getElementById('welcomeInput').value,
-      menu: state.config.menu || [],
-      blocks: state.config.blocks || []
+  // ذخیره پست
+  $('#savePost').onclick = async ()=>{
+    const status=$('#savePostStatus'); status.textContent='در حال ذخیره…';
+
+    // آپلود واقعی: برای سادگی این نمونه فقط فایل‌ها را نادیده می‌گیرد و URLهای موقتی استفاده نمی‌کند.
+    // اگر خواستی واقعی شود، باید فایل‌ها را با fetch به یک API (یا مستقیم به Supabase Storage با anon key + RLS) آپلود کنیم و URL عمومی بگیریم.
+
+    const payload = {
+      id: $('#p_id').value || undefined,
+      title: $('#p_title').value,
+      brand: $('#p_brand').value,
+      subbrand: $('#p_subbrand').value,
+      year: Number($('#p_year').value||0)||null,
+      price_toman: Number($('#p_price').value||0)||0,
+      mileage_km: Number($('#p_mileage').value||0)||null,
+      used: $('#p_used').checked,
+      birang: $('#p_birang').checked,
+      bedun_abrang: $('#p_bedun').checked,
+      retarder: $('#p_retarder').checked,
+      intarder: $('#p_intarder').checked,
+      sold: $('#p_sold').checked,
+      insta_url: $('#p_insta').value,
+      description: $('#p_desc').value,
+      images: state.uploads.map(u=>u.url)   // جایگزین با URL واقعی بعد از آپلود
     };
-    const res = await saveConfig(cfg);
-    status.textContent = res.ok ? 'ذخیره شد ✅' : ('خطا: ' + (res.error||''));
+
+    const r = await fetch('/api/posts',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ initData: tg?.initData||'', payload, editorUser: state.role==='editor'?state.username:undefined })});
+    const j = await r.json();
+    status.textContent = j.ok ? 'ذخیره شد ✅' : ('خطا: '+(j.error||''));
+    if(j.ok){ $('#p_id').value=''; state.uploads=[]; renderUploadPreview(); loadPosts(); }
   };
 
-  // دکمه‌ی اصلی تلگرام (نمونه)
-  if (tg) {
-    tg.MainButton.setText('سلام بگو');
-    tg.MainButton.onClick(()=> tg.showAlert('خوش اومدی! 🌟'));
-    tg.MainButton.show();
-  }
+  // رمزساز
+  $('#genPwd').onclick = async ()=>{
+    const r = await fetch('/api/login',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({ initData: tg?.initData||'', cmd:'generate' })});
+    const j = await r.json(); $('#genStatus').textContent = j.ok?`user: ${j.username} | pass: ${j.password}`:('خطا: '+(j.error||'')); };
 
-  // راه‌اندازی
+  $('#revokeBtn').onclick = async ()=>{
+    const u=$('#rvkUser').value.trim(); if(!u) return alert('username لازم است');
+    const r = await fetch('/api/login',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({ initData: tg?.initData||'', cmd:'revoke', username:u })});
+    const j = await r.json(); $('#genStatus').textContent = j.ok?'لغو شد ✅':'خطا: '+(j.error||''); };
+
+  // فیلترها
+  fillBrandFilter();
+  $('#applyFilters').onclick = loadPosts;
+  $('#resetFilters').onclick = ()=>{ ['f_brand','f_year','f_min','f_max'].forEach(id=>$('#'+id).value=''); ['f_used','f_zero','f_birang','f_bedun','f_retarder','f_intarder'].forEach(id=>$('#'+id).checked=false); loadPosts(); };
+
+  // شروع
   (async ()=>{
     try{
-      const me  = await getMe();         // آیا ادمین؟
-      state.isAdmin = !!me.is_admin;
-
-      const cfg = await getConfig();     // تنظیمات
-      state.config = Object.assign({ welcome_text:'', menu:[], blocks:[] }, cfg||{});
-
-      renderUserView();
-      renderAdmin();
-    }catch(e){
-      debug('init error:', String(e));
-      document.getElementById('welcome').textContent = 'خطا در بارگذاری.';
-    }
+      await getMe();
+      await loadConfig();
+      await loadPosts();
+      // رویداد ساده
+      fetch('/api/track',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'visit',meta:{ts:Date.now()}})});
+    }catch(e){ debug('init error',String(e)); }
   })();
+
+  function esc(s){ return String(s||'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m])) }
 })();
 </script>
 </body>
