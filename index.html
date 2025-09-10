@@ -5,8 +5,12 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>بازار ماشین‌های سنگین</title>
 
+  <!-- Supabase JS (برای کلاینت فرانت) -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <!-- Telegram SDK و SortableJS -->
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
+
   <style>
     body{font-family:sans-serif;margin:0;padding:16px;background:var(--tg-theme-bg-color,#fff);color:var(--tg-theme-text-color,#111)}
     .wrap{max-width:980px;margin:0 auto}
@@ -92,7 +96,7 @@
     </div>
   </div>
 
-  <!-- محتوای مدیریت (منو/بلوک‌ها + CRUD پست‌ها) -->
+  <!-- پنل ادمین -->
   <div id="adminPanel" class="card hidden">
     <h2>پنل ادمین 👑</h2>
 
@@ -186,42 +190,45 @@
 <script>
 (function(){
   const tg = window.Telegram?.WebApp; tg?.expand();
-
   const debug = (...a)=>{ const el=document.getElementById('debug'); el.textContent += '\n'+a.map(x=>{try{return typeof x==='string'?x:JSON.stringify(x)}catch{return String(x)}}).join(' '); };
+  const $ = s => document.querySelector(s);
 
-  // برندها + زیرمنوهای پیشنهادی (می‌تونی بعداً از config بگیری)
+  // کلاینت Supabase برای فرانت (بخش «ب»)
+  let SUPA = null;
+  async function initSupabaseClient(){
+    const r = await fetch('/api/public');
+    const j = await r.json();
+    SUPA = window.supabase.createClient(j.supabaseUrl, j.supabaseAnon);
+  }
+
+  // برندها
   const BRANDS = {
-    "Volvo": ["FH","FM","FMX","F12","F16"],
-    "Scania": ["R","S","P","G","T"],
-    "Mercedes-Benz": ["Actros","Axor","Atego"],
-    "MAN": ["TGX","TGS","TGA","F2000"],
-    "DAF": ["XF","CF","LF"],
-    "Iveco": ["Stralis","Trakker","Eurocargo"],
-    "Renault": ["T","C","K","Magnum","Premium"],
-    "Kamaz": ["5490","6520","6460"],
-    "Howo": ["A7","T7H","T5G"],
-    "FAW": ["JH6","J5P"],
-    "Dongfeng": ["KX","KL","KC"],
-    "Shacman": ["X3000","X5000","M3000"]
+    "Volvo":["FH","FM","FMX","F12","F16"],
+    "Scania":["R","S","P","G","T"],
+    "Mercedes-Benz":["Actros","Axor","Atego"],
+    "MAN":["TGX","TGS","TGA","F2000"],
+    "DAF":["XF","CF","LF"],
+    "Iveco":["Stralis","Trakker","Eurocargo"],
+    "Renault":["T","C","K","Magnum","Premium"],
+    "Kamaz":["5490","6520","6460"],
+    "Howo":["A7","T7H","T5G"],
+    "FAW":["JH6","J5P"],
+    "Dongfeng":["KX","KL","KC"],
+    "Shacman":["X3000","X5000","M3000"]
   };
 
-  // ----- وضعیت سراسری -----
   const state = {
     role:'public', token:'', username:'',
     config:{ welcome_text:'', menu:[], blocks:[] },
-    filters:{},
-    uploads:[], // {file, url}
+    uploads:[]
   };
 
-  // UI helpers
-  const $ = s => document.querySelector(s);
-
+  function esc(s){ return String(s||'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m])) }
   function formatPrice(x){ if(!x) return '—'; return (Number(x)/1e9).toFixed(2).replace(/\.00$/,'') + ' میلیارد'; }
 
-  // ----------------- احراز هویت / منو / بلوک‌ها -----------------
   async function getMe(){
     const init = tg?.initData || '';
-    const q = new URLSearchParams({ initData: init, token: state.token }).toString();
+    const q = new URLSearchParams({ initData:init, token:state.token }).toString();
     const r = await fetch('/api/me?'+q);
     const j = await r.json();
     state.role = j.role || 'public';
@@ -230,7 +237,6 @@
     $('#adminLoginStatus').textContent = j.is_admin ? `ورود: ${state.role}` : 'وارد نشده';
     debug('me →', j);
   }
-
   async function loginEditor(){
     const u = prompt('Username:'); if(u==null) return;
     const p = prompt('Password:'); if(p==null) return;
@@ -239,14 +245,12 @@
     if(j.ok){ state.token=j.token; state.role=j.role; state.username=u; $('#adminLoginStatus').textContent='ورود موفق'; await getMe(); }
     else alert('خطای لاگین');
   }
-
   $('#adminLoginBtn').onclick = loginEditor;
 
   async function loadConfig(){
     const r = await fetch('/api/config'); const j = await r.json();
     state.config = Object.assign({welcome_text:'',menu:[],blocks:[]}, j||{});
     $('#welcome').textContent = state.config.welcome_text || '';
-    // منو و بلوک‌ها در Admin:
     renderMenuEditor(); renderBlocksEditor();
   }
 
@@ -255,7 +259,6 @@
     (state.config.menu||[]).forEach((it,idx)=>ul.appendChild(menuRow(it,idx)));
     new Sortable(ul,{handle:'.handle',animation:150,onEnd:()=>{ const rows=[...ul.querySelectorAll('li')]; state.config.menu=rows.map(li=>({title:li.dataset.title,path:li.dataset.path})) }});
   }
-
   function menuRow(it,idx){
     const li=document.createElement('li'); li.className='item'; li.dataset.title=it.title||''; li.dataset.path=it.path||'';
     li.innerHTML=`<span class="handle">☰</span><div class="grow"><b>${esc(it.title)}</b><div class="pill">${esc(it.path)}</div></div><button data-act="edit">ویرایش</button><button data-act="del">حذف</button>`;
@@ -272,7 +275,6 @@
     (state.config.blocks||[]).forEach((b,idx)=> box.appendChild(blockRow(b,idx)) );
     new Sortable(box,{handle:'.handle',animation:150,onEnd:()=>{ const rows=[...box.children]; state.config.blocks=rows.map(el=>JSON.parse(el.dataset.block)) }});
   }
-
   function blockRow(b,idx){
     const el=document.createElement('div'); el.className='item'; el.dataset.block=JSON.stringify(b);
     el.innerHTML=`<span class="handle">☰</span><div class="grow">${blockSummary(b)}</div><button data-act="edit">ویرایش</button><button data-act="del">حذف</button>`;
@@ -283,53 +285,38 @@
     };
     return el;
   }
-
   function blockSummary(b){
     if(b.type==='text')   return `<b>متن:</b> <span class="pill">${esc((b.text||'').slice(0,50))}</span>`;
     if(b.type==='image')  return `<b>تصویر:</b> <span class="pill">${esc(b.url||'')}</span>`;
     if(b.type==='button') return `<b>دکمه:</b> ${esc(b.text||'')} → <span class="pill">${esc(b.href||'')}</span>`;
     return 'Unknown block';
   }
-
   function editBlock(b,onSave){
     if(b.type==='text'){ const t=prompt('متن:',b.text||''); if(t==null)return; onSave({type:'text',text:t}); }
     if(b.type==='image'){ const u=prompt('آدرس تصویر:',b.url||''); if(u==null)return; const alt=prompt('ALT:',b.alt||''); if(alt==null)return; const cap=prompt('کپشن:',b.caption||''); if(cap==null)return; onSave({type:'image',url:u,alt,caption:cap}); }
     if(b.type==='button'){ const t=prompt('متن دکمه:',b.text||''); if(t==null)return; const h=prompt('Href (مثلاً /go):',b.href||''); if(h==null)return; onSave({type:'button',text:t,href:h}); }
   }
-
   $('#addItemBtn').onclick = ()=>{ const t=$('#newTitle').value.trim();const p=$('#newPath').value.trim(); if(!t)return; state.config.menu.push({title:t,path:p||'/'}); $('#newTitle').value='';$('#newPath').value=''; renderMenuEditor(); };
   $('#addBlockBtn').onclick = ()=>{ const type=$('#blockType').value; const def= type==='text'?{type:'text',text:'متن نمونه'}: type==='image'?{type:'image',url:'https://placehold.co/800x400',alt:'',caption:''}:{type:'button',text:'بزن بریم',href:'/go'}; state.config.blocks.push(def); renderBlocksEditor(); };
+  $('#saveConfig').onclick = async ()=>{ const s=$('#saveConfigStatus'); s.textContent='در حال ذخیره…'; const r= await fetch('/api/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({initData: tg?.initData||'', config:{ welcome_text:$('#welcomeInput').value, menu:state.config.menu, blocks:state.config.blocks }})}); const j= await r.json(); s.textContent = j.ok?'ذخیره شد ✅':'خطا: '+(j.error||''); };
 
-  $('#saveConfig').onclick = async ()=>{
-    const status=$('#saveConfigStatus'); status.textContent='در حال ذخیره…';
-    const r= await fetch('/api/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({initData: tg?.initData||'', config:{ welcome_text:$('#welcomeInput').value, menu:state.config.menu, blocks:state.config.blocks }})});
-    const j= await r.json(); status.textContent = j.ok?'ذخیره شد ✅':'خطا: '+(j.error||'');
-  };
-
-  // ---------------------- فیلترها و لیست پست‌ها ----------------------
-  function fillBrandFilter(){
-    const sel = $('#f_brand'); sel.innerHTML='<option value="">همه برندها</option>';
-    Object.keys(BRANDS).forEach(b=>{ const o=document.createElement('option'); o.value=b;o.textContent=b; sel.appendChild(o); });
-  }
-
+  // فهرست و فیلتر پست‌ها
+  function fillBrandFilter(){ const sel = $('#f_brand'); sel.innerHTML='<option value="">همه برندها</option>'; Object.keys(BRANDS).forEach(b=>{ const o=document.createElement('option'); o.value=b;o.textContent=b; sel.appendChild(o); }); }
   async function loadPosts(){
-    const params = new URLSearchParams();
-    const b=$('#f_brand').value; if(b) params.set('brand',b);
-    const y=$('#f_year').value; if(y) params.set('year',y);
-    const min=$('#f_min').value; if(min) params.set('minp',Math.floor(parseFloat(min||0)*1e9));
-    const max=$('#f_max').value; if(max) params.set('maxp',Math.floor(parseFloat(max||0)*1e9));
-    if($('#f_used').checked && !$('#f_zero').checked) params.set('used','true');
-    if($('#f_zero').checked && !$('#f_used').checked) params.set('used','false');
-    if($('#f_birang').checked) params.set('birang','true');
-    if($('#f_bedun').checked) params.set('bedun','true');
-    if($('#f_retarder').checked) params.set('retarder','true');
-    if($('#f_intarder').checked) params.set('intarder','true');
-
-    const r = await fetch('/api/posts?'+params.toString());
-    const j = await r.json();
-    renderPosts(j.items||[]);
+    const p = new URLSearchParams();
+    const b=$('#f_brand').value; if(b) p.set('brand',b);
+    const y=$('#f_year').value; if(y) p.set('year',y);
+    const min=$('#f_min').value; if(min) p.set('minp',Math.floor(parseFloat(min||0)*1e9));
+    const max=$('#f_max').value; if(max) p.set('maxp',Math.floor(parseFloat(max||0)*1e9));
+    if($('#f_used').checked && !$('#f_zero').checked) p.set('used','true');
+    if($('#f_zero').checked && !$('#f_used').checked) p.set('used','false');
+    if($('#f_birang').checked) p.set('birang','true');
+    if($('#f_bedun').checked) p.set('bedun','true');
+    if($('#f_retarder').checked) p.set('retarder','true');
+    if($('#f_intarder').checked) p.set('intarder','true');
+    const r = await fetch('/api/posts?'+p.toString());
+    const j = await r.json(); renderPosts(j.items||[]);
   }
-
   function renderPosts(items){
     const box = $('#posts'); box.innerHTML='';
     items.forEach(p=>{
@@ -353,15 +340,8 @@
                <button data-act="edit">ویرایش</button>
              </div>` : '' }
       `;
-
-      // گالری
       const g = card.querySelector('.gallery');
-      (p.images||[]).forEach(url=>{
-        const img=document.createElement('img');
-        img.src=url; img.onclick=()=>openModal(url); g.appendChild(img);
-      });
-
-      // تعاملات
+      (p.images||[]).forEach(url=>{ const img=document.createElement('img'); img.src=url; img.onclick=()=>openModal(url); g.appendChild(img); });
       card.onclick = async (e)=>{
         if(e.target?.dataset?.act==='sold'){
           const sold = e.target.checked;
@@ -369,7 +349,6 @@
           loadPosts();
         }
         if(e.target?.dataset?.act==='edit'){
-          // بارگذاری در فرم ادمین برای ویرایش
           $('#p_id').value=p.id; $('#p_title').value=p.title||''; $('#p_brand').value=p.brand||''; $('#p_subbrand').value=p.subbrand||'';
           $('#p_year').value=p.year||''; $('#p_price').value=p.price_toman||''; $('#p_mileage').value=p.mileage_km||'';
           $('#p_used').checked=!!p.used; $('#p_birang').checked=!!p.birang; $('#p_bedun').checked=!!p.bedun;
@@ -380,39 +359,63 @@
           window.scrollTo({top:document.body.scrollHeight, behavior:'smooth'});
         }
       };
-
       box.appendChild(card);
     });
   }
 
-  // -------------------- آپلود تصاویر (پیش‌نمایش + مدال) --------------------
+  // بزرگ‌نمایی
   function openModal(url){ const m=$('#modal'); $('#modalImg').src=url; m.style.display='flex'; }
 
+  // ------------------ (ج) آپلود واقعی با Signed URL ------------------
   $('#p_images').onchange = async (e)=>{
-    const files = Array.from(e.target.files||[]);
-    for(const f of files){
-      // اینجا برای سادگی از URL موقت مرورگر استفاده می‌کنیم؛
-      // در عمل می‌تونی به /api/upload-url بفرستی و روی برگشتی ذخیره کنی.
-      const url=URL.createObjectURL(f);
-      state.uploads.push({file:f,url});
+    const files = Array.from(e.target.files || []);
+    for (const f of files) {
+      const url = await uploadFileToSupabase(f);
+      if (url) state.uploads.push({ file:null, url });
     }
     renderUploadPreview();
   };
 
+  async function uploadFileToSupabase(file){
+    try{
+      // 1) از سرور URL امضاشده بگیر
+      const body = {
+        filename: file.name,
+        initData: tg?.initData || '',
+        editorUser: (state.role==='editor' ? state.username : undefined)
+      };
+      const r1 = await fetch('/api/upload-url', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify(body)
+      });
+      const j1 = await r1.json();
+      if(!j1.ok) throw new Error(j1.error || 'upload_url_failed');
+
+      // 2) آپلود مستقیم به Supabase
+      const up = await SUPA.storage
+        .from(j1.bucket)
+        .uploadToSignedUrl(j1.path, j1.token, file, {
+          contentType: file.type || 'application/octet-stream',
+          upsert: false
+        });
+      if (up.error) throw new Error(up.error.message);
+
+      // 3) URL عمومی
+      return j1.publicUrl;
+    }catch(e){
+      alert('خطا در آپلود: ' + String(e));
+      return null;
+    }
+  }
+
   function renderUploadPreview(){
     const g=$('#p_gallery'); g.innerHTML='';
-    state.uploads.forEach((u,i)=>{
-      const img=document.createElement('img'); img.src=u.url; img.onclick=()=>openModal(u.url); g.appendChild(img);
-    });
+    state.uploads.forEach((u)=>{ const img=document.createElement('img'); img.src=u.url; img.onclick=()=>openModal(u.url); g.appendChild(img); });
   }
 
   // ذخیره پست
   $('#savePost').onclick = async ()=>{
-    const status=$('#savePostStatus'); status.textContent='در حال ذخیره…';
-
-    // آپلود واقعی: برای سادگی این نمونه فقط فایل‌ها را نادیده می‌گیرد و URLهای موقتی استفاده نمی‌کند.
-    // اگر خواستی واقعی شود، باید فایل‌ها را با fetch به یک API (یا مستقیم به Supabase Storage با anon key + RLS) آپلود کنیم و URL عمومی بگیریم.
-
+    const s=$('#savePostStatus'); s.textContent='در حال ذخیره…';
     const payload = {
       id: $('#p_id').value || undefined,
       title: $('#p_title').value,
@@ -429,42 +432,30 @@
       sold: $('#p_sold').checked,
       insta_url: $('#p_insta').value,
       description: $('#p_desc').value,
-      images: state.uploads.map(u=>u.url)   // جایگزین با URL واقعی بعد از آپلود
+      images: state.uploads.map(u=>u.url)
     };
-
     const r = await fetch('/api/posts',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ initData: tg?.initData||'', payload, editorUser: state.role==='editor'?state.username:undefined })});
     const j = await r.json();
-    status.textContent = j.ok ? 'ذخیره شد ✅' : ('خطا: '+(j.error||''));
+    s.textContent = j.ok ? 'ذخیره شد ✅' : ('خطا: '+(j.error||''));
     if(j.ok){ $('#p_id').value=''; state.uploads=[]; renderUploadPreview(); loadPosts(); }
   };
 
-  // رمزساز
-  $('#genPwd').onclick = async ()=>{
-    const r = await fetch('/api/login',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({ initData: tg?.initData||'', cmd:'generate' })});
-    const j = await r.json(); $('#genStatus').textContent = j.ok?`user: ${j.username} | pass: ${j.password}`:('خطا: '+(j.error||'')); };
-
-  $('#revokeBtn').onclick = async ()=>{
-    const u=$('#rvkUser').value.trim(); if(!u) return alert('username لازم است');
-    const r = await fetch('/api/login',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({ initData: tg?.initData||'', cmd:'revoke', username:u })});
-    const j = await r.json(); $('#genStatus').textContent = j.ok?'لغو شد ✅':'خطا: '+(j.error||''); };
-
   // فیلترها
-  fillBrandFilter();
+  function fillBrandFilter(){ const sel = $('#f_brand'); sel.innerHTML='<option value="">همه برندها</option>'; Object.keys(BRANDS).forEach(b=>{ const o=document.createElement('option'); o.value=b;o.textContent=b; sel.appendChild(o); }); }
   $('#applyFilters').onclick = loadPosts;
   $('#resetFilters').onclick = ()=>{ ['f_brand','f_year','f_min','f_max'].forEach(id=>$('#'+id).value=''); ['f_used','f_zero','f_birang','f_bedun','f_retarder','f_intarder'].forEach(id=>$('#'+id).checked=false); loadPosts(); };
 
   // شروع
   (async ()=>{
     try{
+      await initSupabaseClient();        // ← (ب) ساخت کلاینت فرانت
       await getMe();
       await loadConfig();
+      fillBrandFilter();
       await loadPosts();
-      // رویداد ساده
       fetch('/api/track',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'visit',meta:{ts:Date.now()}})});
     }catch(e){ debug('init error',String(e)); }
   })();
-
-  function esc(s){ return String(s||'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m])) }
 })();
 </script>
 </body>
